@@ -110,5 +110,13 @@ fi
 if xset -q >/dev/null 2>&1 ; then
   export EDITOR="codium -n -w"
 else
-  export EDITOR=xc
+  if hx --version >/dev/null 2>&1; then
+    export EDITOR=hx
+  elif nvim --version >/dev/null 2>&1; then
+    export EDITOR=nvim
+  elif vim --version >/dev/null 2>&1; then
+    export EDITOR=vim
+  else
+    export EDITOR=vi
+  fi
 fi
