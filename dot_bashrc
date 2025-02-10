@@ -72,3 +72,6 @@ else
     export EDITOR=vi
   fi
 fi
+
+alias cz='chezmoi'
+alias vsc='vscli open'
