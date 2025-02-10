@@ -55,6 +55,7 @@ plugins=(
 #  fi
 
 source "$OSH"/oh-my-bash.sh
+unalias cd
 
 [[ -s "$HOME/.gvm/scripts/gvm" ]] && source "$HOME/.gvm/scripts/gvm"
 
