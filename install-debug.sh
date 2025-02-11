@@ -3,7 +3,7 @@
 # -e: exit on error
 # -u: exit on unset variables
 # -x: trace commands
-set -eux
+set -e
 
 if ! chezmoi="$(command -v chezmoi)"; then
 	bin_dir="${HOME}/.local/bin"
