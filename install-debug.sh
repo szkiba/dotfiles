@@ -28,4 +28,8 @@ set -- init --apply --source="${script_dir}"
 
 echo "Running 'chezmoi $*'" >&2
 # exec: replace current process with chezmoi
-chezmoi -v $*
+cat <<END
+exec "$chezmoi" -v "$@"
+END
+
+"$chezmoi" -v "$@"
