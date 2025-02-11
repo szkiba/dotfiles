@@ -27,4 +27,7 @@ set -- init --apply --source="${script_dir}"
 
 echo "Running 'chezmoi $*'" >&2
 # exec: replace current process with chezmoi
-exec "$chezmoi" "$@"
+"$chezmoi" "$@"
+
+git clone https://github.com/ohmybash/oh-my-bash.git ~/.oh-my-bash
+
