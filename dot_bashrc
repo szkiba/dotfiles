@@ -74,4 +74,5 @@ else
 fi
 
 alias cz='chezmoi'
-alias vsc='vscli open'
+alias v='vscli open'
+alias dp='devpod'
