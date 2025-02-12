@@ -54,14 +54,13 @@ plugins=(
 #      plugins+=(tmux-autoattach)
 #  fi
 
-source "$OSH"/oh-my-bash.sh
-unalias cd
+[[ -s "$OSH/oh-my-bash.sh" ]] && source "$OSH/oh-my-bash.sh" && unalias cd
 
-[[ -s "$HOME/.gvm/scripts/gvm" ]] && source "$HOME/.gvm/scripts/gvm"
+# [[ -s "$HOME/.gvm/scripts/gvm" ]] && source "$HOME/.gvm/scripts/gvm"
 
 if xset -q >/dev/null 2>&1 ; then
   if zed --version > /dev/null 2>&1; then
-    export EDITOR="zed -w --foreground"
+    export EDITOR="zed -w"
   elif codium --version > /dev/null 2>&1; then
     export EDITOR="codium -n -w"
   elif code --version > /dev/null 2>&1; then
