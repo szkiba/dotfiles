@@ -1,25 +1,19 @@
 contexts:
   default:
-    defaultIde: none
     options:
       DOTFILES_SCRIPT:
         value: install.sh
       DOTFILES_URL:
         value: https://github.com/szkiba/dotfiles.git
+    defaultIde: vscode
     defaultProvider: docker
     providers:
       docker:
-        creationTimestamp: "2025-02-10T13:09:57Z"
+        creationTimestamp: null
         initialized: true
         options:
-          DOCKER_BUILDER:
-            userProvided: true
-          DOCKER_HOST:
-            userProvided: true
+          DOCKER_BUILDER: {}
+          DOCKER_HOST: {}
           DOCKER_PATH:
-            userProvided: true
             value: docker
-          INACTIVITY_TIMEOUT:
-            userProvided: true
-        singleMachine: true
-defaultContext: default
+          INACTIVITY_TIMEOUT: {}
