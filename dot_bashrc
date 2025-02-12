@@ -59,9 +59,7 @@ plugins=(
 # [[ -s "$HOME/.gvm/scripts/gvm" ]] && source "$HOME/.gvm/scripts/gvm"
 
 if xset -q >/dev/null 2>&1 ; then
-  if zed --version > /dev/null 2>&1; then
-    export EDITOR="zed -w"
-  elif codium --version > /dev/null 2>&1; then
+  if codium --version > /dev/null 2>&1; then
     export EDITOR="codium -n -w"
   elif code --version > /dev/null 2>&1; then
     export EDITOR="code -w"
