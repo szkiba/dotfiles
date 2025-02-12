@@ -27,7 +27,7 @@ if [ -d "$HOME/.local/bin" ] ; then
 fi
 
 # expose GitHub token for DevContainer
-if [ -z "$GH_TOKEN" ] ; then
+if [ -z "$GH_TOKEN" ] && gh --version >/dev/null 2>&1  ; then
     GH_TOKEN=`gh auth token`
     export GH_TOKEN
 fi
