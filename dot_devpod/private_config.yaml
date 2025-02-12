@@ -5,7 +5,7 @@ contexts:
         value: install.sh
       DOTFILES_URL:
         value: https://github.com/szkiba/dotfiles.git
-    defaultIde: vscode
+    defaultIde: zed
     defaultProvider: docker
     providers:
       docker:
