@@ -85,7 +85,7 @@ alias cz='chezmoi'
 alias v='vscli open'
 alias dp='devpod'
 
-if [ -n "${FLOX_PROMPT_ENVIRONMENTS}${DEVBOX_PROJECT_ROOT}${DEVPOD_WORKSPACE_ID}" ]; then
+if [ -n "${FLOX_ENV}${DEVBOX_WD}${DEVPOD}${REMOTE_CONTAINERS}" ]; then
   function _omb_theme_PROMPT_COMMAND() {
       # This needs to be first to save last command return code
       local RC="$?"
@@ -93,12 +93,12 @@ if [ -n "${FLOX_PROMPT_ENVIRONMENTS}${DEVBOX_PROJECT_ROOT}${DEVPOD_WORKSPACE_ID}
       local hostname="${_omb_prompt_bold_gray}\u@\h"
       local venv
 
-      if [ -n "$FLOX_PROMPT_ENVIRONMENTS" ]; then
-        venv="${_omb_prompt_bold_purple}[$FLOX_PROMPT_ENVIRONMENTS] "
-      elif [ -n "$DEVBOX_PROJECT_ROOT" ]; then
-        venv="${_omb_prompt_bold_yellow}[$(basename $DEVBOX_PROJECT_ROOT)] "
-      elif [ -n "$DEVPOD_WORKSPACE_ID" ]; then
-        venv="${_omb_prompt_bold_blue}[$(basename $DEVPOD_WORKSPACE_ID)] "
+      if [ -n "${FLOX_ENV}${DEVBOX_WD}" ]; then
+        venv="👻 "
+      elif [ -n "${DEVPOD}${REMOTE_CONTAINERS}" ]; then
+        venv="📦 "
+      else
+        venv="📡 "
       fi
 
       # Set return status color
