@@ -84,3 +84,34 @@ fi
 alias cz='chezmoi'
 alias v='vscli open'
 alias dp='devpod'
+
+if [ -n "${FLOX_PROMPT_ENVIRONMENTS}${DEVBOX_PROJECT_ROOT}${DEVPOD_WORKSPACE_ID}" ]; then
+  function _omb_theme_PROMPT_COMMAND() {
+      # This needs to be first to save last command return code
+      local RC="$?"
+
+      local hostname="${_omb_prompt_bold_gray}\u@\h"
+      local venv
+
+      if [ -n "$FLOX_PROMPT_ENVIRONMENTS" ]; then
+        venv="${_omb_prompt_bold_purple}[$FLOX_PROMPT_ENVIRONMENTS] "
+      elif [ -n "$DEVBOX_PROJECT_ROOT" ]; then
+        venv="${_omb_prompt_bold_yellow}[$(basename $DEVBOX_PROJECT_ROOT)] "
+      elif [ -n "$DEVPOD_WORKSPACE_ID"]
+        venv="${_omb_prompt_bold_blue}[$(basename $DEVPOD_WORKSPACE_ID)] "
+      fi
+
+      # Set return status color
+      if [[ ${RC} == 0 ]]; then
+          ret_status="${_omb_prompt_bold_green}"
+      else
+          ret_status="${_omb_prompt_bold_brown}"
+      fi
+
+      # Append new history lines to history file
+      history -a
+
+      PS1="$(clock_prompt)$venv${hostname} ${_omb_prompt_bold_teal}\W $(scm_prompt_char_info)${ret_status}→ ${_omb_prompt_normal}"
+  }
+fi
+
