@@ -97,7 +97,7 @@ if [ -n "${FLOX_PROMPT_ENVIRONMENTS}${DEVBOX_PROJECT_ROOT}${DEVPOD_WORKSPACE_ID}
         venv="${_omb_prompt_bold_purple}[$FLOX_PROMPT_ENVIRONMENTS] "
       elif [ -n "$DEVBOX_PROJECT_ROOT" ]; then
         venv="${_omb_prompt_bold_yellow}[$(basename $DEVBOX_PROJECT_ROOT)] "
-      elif [ -n "$DEVPOD_WORKSPACE_ID"]
+      elif [ -n "$DEVPOD_WORKSPACE_ID" ]; then
         venv="${_omb_prompt_bold_blue}[$(basename $DEVPOD_WORKSPACE_ID)] "
       fi
 
