@@ -56,7 +56,14 @@ plugins=(
 
 [[ -s "$OSH/oh-my-bash.sh" ]] && source "$OSH/oh-my-bash.sh" && unalias cd
 
-# [[ -s "$HOME/.gvm/scripts/gvm" ]] && source "$HOME/.gvm/scripts/gvm"
+export HOMEBREW_NO_ANALYTICS=1
+[[ -x /home/linuxbrew/.linuxbrew/bin/brew ]] && eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)"
+
+if direnv --version >/dev/null 2>&1 ; then
+  eval "$(direnv hook bash)"
+fi
+
+[[ -s "$HOME/.gvm/scripts/gvm" ]] && source "$HOME/.gvm/scripts/gvm"
 
 if xset -q >/dev/null 2>&1 ; then
   if codium --version > /dev/null 2>&1; then
@@ -115,3 +122,6 @@ if [ -n "${FLOX_ENV}${DEVBOX_WD}${DEVPOD}${REMOTE_CONTAINERS}" ]; then
   }
 fi
 
+if [ -f ~/Documents/CloudBox/keys/ansible-vault-password ]; then
+  export ANSIBLE_VAULT_PASSWORD_FILE=$HOME/Documents/CloudBox/keys/ansible-vault-password
+fi

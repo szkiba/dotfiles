@@ -1,0 +1,6 @@
+.svn
+.env.local
+.envrc.local
+.env.private
+.envrc.private
+

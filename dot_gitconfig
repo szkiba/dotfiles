@@ -4,5 +4,6 @@
 
 [core]
 	quotepath = false
+	excludesfile = /home/iszkiba/.config/git/ignore
 [init]
 	defaultBranch = main
