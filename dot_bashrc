@@ -63,7 +63,7 @@ if direnv --version >/dev/null 2>&1 ; then
   eval "$(direnv hook bash)"
 fi
 
-[[ -s "$HOME/.gvm/scripts/gvm" ]] && source "$HOME/.gvm/scripts/gvm"
+# [[ -s "$HOME/.gvm/scripts/gvm" ]] && source "$HOME/.gvm/scripts/gvm"
 
 if xset -q >/dev/null 2>&1 ; then
   if codium --version > /dev/null 2>&1; then
@@ -125,3 +125,7 @@ fi
 if [ -f ~/Documents/CloudBox/keys/ansible-vault-password ]; then
   export ANSIBLE_VAULT_PASSWORD_FILE=$HOME/Documents/CloudBox/keys/ansible-vault-password
 fi
+
+alias c=cursor
+
+

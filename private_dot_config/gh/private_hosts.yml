@@ -1,5 +1,5 @@
 github.com:
-    user: szkiba
     git_protocol: ssh
     users:
         szkiba:
+    user: szkiba
