@@ -1,20 +1,20 @@
 [user]
 	email = szkiba@users.noreply.github.com
 	name = Iván SZKIBA
-        signingkey = ~/.ssh/pub-piv-9a            
+	signingkey = ~/.ssh/pub-piv-9a            
 
 [core]
 	quotepath = false
-        excludesfile = ~/.config/git/ignore            
+	excludesfile = ~/.config/git/ignore            
 
 [init]
 	defaultBranch = main
 
 [gpg]
-        format = ssh
+	format = ssh
 
 [commit]
-        gpgsign = true
+	gpgsign = true
 
 [gpg "ssh"]
-        allowedSignersFile = ~/.ssh/allowed_signers            
+	allowedSignersFile = ~/.ssh/allowed_signers            
