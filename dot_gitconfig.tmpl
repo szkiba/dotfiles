@@ -1,0 +1,36 @@
+{{- $signingkey := "" -}}
+{{- $tpmKey := joinPath .chezmoi.homeDir ".ssh" ( print "key-tpm-" .chezmoi.hostname ".pub" ) -}}
+{{- if stat $tpmKey -}}
+{{-   $tpmDB := joinPath .chezmoi.homeDir ".tpm2_pkcs11" "tpm2_pkcs11.sqlite3" -}}
+{{-   if stat $tpmDB -}}
+{{-     $signingkey = $tpmKey -}}
+{{-   end -}}
+{{- end -}}
+{{- if not $signingkey -}}
+{{-   $pivKey := joinPath .chezmoi.homeDir ".ssh" "pub-piv-9a" -}}
+{{-   if stat $pivKey -}}
+{{-     $signingkey = $pivKey -}}
+{{-   end -}}
+{{- end -}}
+
+
+[user]
+	email = szkiba@users.noreply.github.com
+	name = Iván SZKIBA
+{{- if $signingkey}}{{print "\n\t" "signingkey = " $signingkey}}{{end}}
+
+[core]
+	quotepath = false
+	excludesfile = ~/.config/git/ignore            
+
+[init]
+	defaultBranch = main
+
+[gpg]
+	format = ssh
+
+[commit]
+	gpgsign = true
+
+[gpg "ssh"]
+	allowedSignersFile = ~/.ssh/allowed_signers            
