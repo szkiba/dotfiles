@@ -56,6 +56,8 @@ plugins=(
 
 [[ -s "$OSH/oh-my-bash.sh" ]] && source "$OSH/oh-my-bash.sh" && unalias cd
 
+export LS_COLORS="$LS_COLORS:*,v=2;30:RCS=2,30"
+
 export HOMEBREW_NO_ANALYTICS=1
 [[ -x /home/linuxbrew/.linuxbrew/bin/brew ]] && eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)"
 
