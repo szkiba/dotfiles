@@ -130,4 +130,7 @@ fi
 
 alias c=cursor
 
+[ -s ~/.vscode/code.sh ] && . ~/.vscode/code.sh
+
+unset PAGER
 
