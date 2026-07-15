@@ -65,7 +65,7 @@ if direnv --version >/dev/null 2>&1 ; then
   eval "$(direnv hook bash)"
 fi
 
-[ -r ~/.host-secrets.env ] && . ~/.host-secrets.env
+[ -r ~/.secrets.env ] && . ~/.secrets.env
 
 # [[ -s "$HOME/.gvm/scripts/gvm" ]] && source "$HOME/.gvm/scripts/gvm"
 
