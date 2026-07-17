@@ -10,7 +10,7 @@ Eligible key lines:
 - Exclude certificate lines containing `-cert-`.
 
 Result:
-- `user.signingkey` is set to the literal public key line (not a file path).
+- `user.signingkey` is set to `key::<public-key-line>` (not a file path).
 - If no eligible keys are loaded in ssh-agent, `user.signingkey` is omitted.
 */}}
 {{- $signingkey := "" -}}
@@ -23,13 +23,13 @@ Result:
 {{-     $line = trim $line -}}
 {{-     if and $line (or (hasPrefix "ssh-" $line) (hasPrefix "ecdsa-" $line) (hasPrefix "sk-" $line)) (not (contains "-cert-" $line)) -}}
 {{-       if not $firstKey -}}
-{{-         $firstKey = $line -}}
+{{-         $firstKey = print "key::" $line -}}
 {{-       end -}}
 {{-       if and (not $skKey) (hasPrefix "sk-" $line) -}}
-{{-         $skKey = $line -}}
+{{-         $skKey = print "key::" $line -}}
 {{-       end -}}
 {{-       if and (not $signingkey) (contains "tpm" (lower $line)) -}}
-{{-         $signingkey = $line -}}
+{{-         $signingkey = print "key::" $line -}}
 {{-       end -}}
 {{-     end -}}
 {{-   end -}}
