@@ -21,7 +21,10 @@
 
 [core]
 	quotepath = false
-	excludesfile = ~/.config/git/ignore            
+	excludesfile = ~/.config/git/ignore
+{{- if lookPath "delta" }}
+	pager = delta
+{{- end }}
 
 [init]
 	defaultBranch = main
@@ -33,4 +36,16 @@
 	gpgsign = true
 
 [gpg "ssh"]
-	allowedSignersFile = ~/.ssh/allowed_signers            
+	allowedSignersFile = ~/.ssh/allowed_signers
+
+{{ if lookPath "delta" -}}
+[interactive]
+	diffFilter = delta --color-only
+
+[delta]
+	navigate = true
+	dark = true
+
+[merge]
+	conflictStyle = zdiff3
+{{- end }}
