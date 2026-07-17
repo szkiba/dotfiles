@@ -1,15 +1,43 @@
+{{/*
+Signing key selection for Git SSH signing:
+1. Read ssh-agent public keys via `ssh-add -L`.
+2. Prefer the first eligible key line containing `tpm` (case-insensitive).
+3. Otherwise prefer the first eligible `sk-` key line.
+4. Otherwise use the first eligible key line.
+
+Eligible key lines:
+- Start with `ssh-`, `ecdsa-`, or `sk-`.
+- Exclude certificate lines containing `-cert-`.
+
+Result:
+- `user.signingkey` is set to the literal public key line (not a file path).
+- If no eligible keys are loaded in ssh-agent, `user.signingkey` is omitted.
+*/}}
 {{- $signingkey := "" -}}
-{{- $tpmKey := joinPath .chezmoi.homeDir ".ssh" ( print "key-tpm-" .chezmoi.hostname ".pub" ) -}}
-{{- if stat $tpmKey -}}
-{{-   $tpmDB := joinPath .chezmoi.homeDir ".tpm2_pkcs11" "tpm2_pkcs11.sqlite3" -}}
-{{-   if stat $tpmDB -}}
-{{-     $signingkey = $tpmKey -}}
+{{- $agentKeys := output "sh" "-c" "ssh-add -L 2>/dev/null || true" -}}
+{{- $agentKeys = trim $agentKeys -}}
+{{- if $agentKeys -}}
+{{-   $firstKey := "" -}}
+{{-   $skKey := "" -}}
+{{-   range $line := splitList "\n" $agentKeys -}}
+{{-     $line = trim $line -}}
+{{-     if and $line (or (hasPrefix "ssh-" $line) (hasPrefix "ecdsa-" $line) (hasPrefix "sk-" $line)) (not (contains "-cert-" $line)) -}}
+{{-       if not $firstKey -}}
+{{-         $firstKey = $line -}}
+{{-       end -}}
+{{-       if and (not $skKey) (hasPrefix "sk-" $line) -}}
+{{-         $skKey = $line -}}
+{{-       end -}}
+{{-       if and (not $signingkey) (contains "tpm" (lower $line)) -}}
+{{-         $signingkey = $line -}}
+{{-       end -}}
+{{-     end -}}
 {{-   end -}}
-{{- end -}}
-{{- if not $signingkey -}}
-{{-   $pivKey := joinPath .chezmoi.homeDir ".ssh" "pub-piv-9a" -}}
-{{-   if stat $pivKey -}}
-{{-     $signingkey = $pivKey -}}
+{{-   if and (not $signingkey) $skKey -}}
+{{-     $signingkey = $skKey -}}
+{{-   end -}}
+{{-   if and (not $signingkey) $firstKey -}}
+{{-     $signingkey = $firstKey -}}
 {{-   end -}}
 {{- end -}}
 
