@@ -1,0 +1,3 @@
+Host ada
+    HostName ada
+    ForwardAgent yes

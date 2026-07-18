@@ -1,0 +1,4 @@
+Host iszkiba-w
+    HostName iszkiba-w
+    IdentityFile ~/.ssh/yubikey-piv-9a.pub
+    ForwardAgent yes

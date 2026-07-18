@@ -1,0 +1,13 @@
+# PKCS11 providers for hardware tokens (uncomment if using TPM or YubiKey)
+# PKCS11Provider /usr/lib/x86_64-linux-gnu/pkcs11/libtpm2_pkcs11.so
+# PKCS11Provider /usr/lib/x86_64-linux-gnu/libykcs11.so
+
+Include config.d/*
+
+Host *
+    PasswordAuthentication no
+    KbdInteractiveAuthentication no
+    PreferredAuthentications publickey
+
+    ForwardAgent no
+

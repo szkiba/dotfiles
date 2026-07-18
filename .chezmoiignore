@@ -1,1 +1,13 @@
 install.sh
+
+# SSH private key material — never manage in dotfiles
+.ssh/id_*
+.ssh/*_rsa
+.ssh/*_ed25519
+.ssh/*_ecdsa
+.ssh/*.key
+!.ssh/*.pub
+
+# machine-specific + leaks hosts you've connected to
+.ssh/known_hosts
+.ssh/known_hosts.old

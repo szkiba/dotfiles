@@ -1,0 +1,14 @@
+# Backstop: never commit plaintext private keys to source repo.
+# Matches chezmoi source names too (suffix match on private_ prefix).
+# Encrypted secrets (*.age / *.asc) are safe and NOT ignored.
+*id_rsa
+*id_ed25519
+*id_ecdsa
+*id_dsa
+*.key
+*.pem
+!*.pub
+
+# OS / editor noise
+.DS_Store
+*.swp

@@ -1,0 +1,10 @@
+Host pet
+  HostName 192.168.121.161
+  User vagrant
+  Port 22
+  StrictHostKeyChecking accept-new
+  UpdateHostKeys yes
+  PasswordAuthentication no
+  IdentityFile /home/iszkiba/pet/.vagrant/machines/default/libvirt/private_key
+  IdentitiesOnly yes
+
