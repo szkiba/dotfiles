@@ -8,7 +8,7 @@ esac
 export OSH="$HOME/.oh-my-bash"
 
 if [ ! -d "$OSH" ] ; then
-  git clone https://github.com/ohmybash/oh-my-bash.git "$OSH"
+  git clone -q https://github.com/ohmybash/oh-my-bash.git "$OSH"
 fi
 
 # Set name of the theme to load. Optionally, if you set this to "random"
