@@ -1,51 +1,18 @@
 {{/*
-Signing key selection for Git SSH signing:
-1. Read ssh-agent public keys via `ssh-add -L`.
-2. Prefer the first eligible key line containing `tpm` (case-insensitive).
-3. Otherwise prefer the first eligible `sk-` key line.
-4. Otherwise use the first eligible key line.
+Git SSH signing configuration:
+1. Trust keys from ~/.config/git/allowed_signers.
+2. Select the signing key at sign time via gpg.ssh.defaultKeyCommand.
+3. The selector returns the first key listed in allowed_signers that is
+   currently loaded in ssh-agent.
 
-Eligible key lines:
-- Start with `ssh-`, `ecdsa-`, or `sk-`.
-- Exclude certificate lines containing `-cert-`.
-
-Result:
-- `user.signingkey` is set to `key::<public-key-line>` (not a file path).
-- If no eligible keys are loaded in ssh-agent, `user.signingkey` is omitted.
+This keeps allowed_signers as the source of truth for both trust and key
+priority, and avoids storing a stale user.signingkey in ~/.gitconfig.
 */}}
-{{- $signingkey := "" -}}
-{{- $agentKeys := output "sh" "-c" "ssh-add -L 2>/dev/null || true" -}}
-{{- $agentKeys = trim $agentKeys -}}
-{{- if $agentKeys -}}
-{{-   $firstKey := "" -}}
-{{-   $skKey := "" -}}
-{{-   range $line := splitList "\n" $agentKeys -}}
-{{-     $line = trim $line -}}
-{{-     if and $line (or (hasPrefix "ssh-" $line) (hasPrefix "ecdsa-" $line) (hasPrefix "sk-" $line)) (not (contains "-cert-" $line)) -}}
-{{-       if not $firstKey -}}
-{{-         $firstKey = print "key::" $line -}}
-{{-       end -}}
-{{-       if and (not $skKey) (hasPrefix "sk-" $line) -}}
-{{-         $skKey = print "key::" $line -}}
-{{-       end -}}
-{{-       if and (not $signingkey) (contains "tpm" (lower $line)) -}}
-{{-         $signingkey = print "key::" $line -}}
-{{-       end -}}
-{{-     end -}}
-{{-   end -}}
-{{-   if and (not $signingkey) $skKey -}}
-{{-     $signingkey = $skKey -}}
-{{-   end -}}
-{{-   if and (not $signingkey) $firstKey -}}
-{{-     $signingkey = $firstKey -}}
-{{-   end -}}
-{{- end -}}
 
 
 [user]
 	email = szkiba@users.noreply.github.com
 	name = Iván SZKIBA
-{{- if $signingkey}}{{print "\n\t" "signingkey = " $signingkey}}{{end}}
 
 [core]
 	quotepath = false
@@ -64,7 +31,8 @@ Result:
 	gpgsign = true
 
 [gpg "ssh"]
-	allowedSignersFile = ~/.ssh/allowed_signers
+	allowedSignersFile = ~/.config/git/allowed_signers
+	defaultKeyCommand = {{ .chezmoi.homeDir }}/.config/git/signing-key-command
 
 {{ if lookPath "delta" -}}
 [interactive]
