@@ -130,9 +130,22 @@ if [ -f ~/Documents/CloudBox/keys/ansible-vault-password ]; then
   export ANSIBLE_VAULT_PASSWORD_FILE=$HOME/Documents/CloudBox/keys/ansible-vault-password
 fi
 
-alias c=cursor
-
 [ -s ~/.vscode/code.sh ] && . ~/.vscode/code.sh
 
 unset PAGER
 
+c() {
+    if [ -z "$1" ]; then
+        echo "Error: Please provide a VM/Workspace name."
+        echo "Usage: c <name>"
+        return 1
+    fi
+
+    # Check if the folder exists on the remote machine via SSH
+    if [ ! -d "/code/$1" ]; then
+        echo "Error: Directory /code/$1 does not exist."
+        return 1
+    fi
+    
+    code --remote "ssh-remote+$1" "/code/$1"
+}
