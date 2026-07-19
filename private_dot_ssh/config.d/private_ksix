@@ -1,0 +1,3 @@
+Host ksix
+    HostName ksix
+    ForwardAgent yes

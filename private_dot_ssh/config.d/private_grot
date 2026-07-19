@@ -1,0 +1,3 @@
+Host grot
+    HostName grot
+    ForwardAgent yes
