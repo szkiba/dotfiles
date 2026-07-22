@@ -1,6 +1,14 @@
 ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIJgjaP3cIGw0FEVbEnNlU3yAmz2GyXW0ry5Oc0hd/SuK ivan@szkiba.hu # YubiKey OpenPGP
+
+sk-ssh-ed25519@openssh.com AAAAGnNrLXNzaC1lZDI1NTE5QG9wZW5zc2guY29tAAAAIAQ0M5HWjTcyFKEyKhuE68ROSkTlhikUqra/89zFeUUVAAAABHNzaDo= ivan+yubikey-170@szkiba.hu
+sk-ssh-ed25519@openssh.com AAAAGnNrLXNzaC1lZDI1NTE5QG9wZW5zc2guY29tAAAAIKKGuENnJO9wBUckHUPmP9fnjxxKAVyeLZt8ToT9enQqAAAABHNzaDo= ivan+yubikey-190@szkiba.hu
+sk-ssh-ed25519@openssh.com AAAAGnNrLXNzaC1lZDI1NTE5QG9wZW5zc2guY29tAAAAIA3jZWD0fBu4OyHKNfrvKLBFnHj6DSkOOb/REaPSM5TuAAAABHNzaDo= ivan+yubikey-192@szkiba.hu
+sk-ssh-ed25519@openssh.com AAAAGnNrLXNzaC1lZDI1NTE5QG9wZW5zc2guY29tAAAAIJSwLsjTD5gV7FKcFCHOb666P3nwk5Vn0PlPEuqdd97tAAAABHNzaDo= ivan+yubikey-226@szkiba.hu
+
 sk-ssh-ed25519@openssh.com AAAAGnNrLXNzaC1lZDI1NTE5QG9wZW5zc2guY29tAAAAIMBgN6SDzc9yqOl4qFY0DQthiVi/c98ZzsRyIrKnvlwQAAAAC3NzaDpzay1ibHVl ivan+sk-blue@szkiba.hu # Security Key by Yubico sk-blue
+
 ecdsa-sha2-nistp256 AAAAE2VjZHNhLXNoYTItbmlzdHAyNTYAAAAIbmlzdHAyNTYAAABBBEp9Lzq1p9gige1gSU6m6m2qH9FY9jT6SiTpe9EWoTcuD8pwU+JVVb7/4YQw8wHxNhffR2/dpSs9oUXFMEiAKEc= ivan+piv-9a@szkiba.hu # YubiKey PIV slot 9a
 
-
-ecdsa-sha2-nistp256 AAAAE2VjZHNhLXNoYTItbmlzdHAyNTYAAAAIbmlzdHAyNTYAAABBBLNkToFRx8P0pHY7sZObqJHlIGwFJGwmg387L8lVulEphS3EJT8/v+i260AGWOb7XHI4KxjLAoiWNz9ymvmgD8E= ivan+tpm-iszkiba-g@szkiba.hu
+sk-ssh-ed25519@openssh.com AAAAGnNrLXNzaC1lZDI1NTE5QG9wZW5zc2guY29tAAAAIOltZx1R/RfCFGFSH5w1v9AIhxlWcHcEPOI/xg03wCwiAAAABHNzaDo= ivan+token2-769@szkiba.hu
+sk-ssh-ed25519@openssh.com AAAAGnNrLXNzaC1lZDI1NTE5QG9wZW5zc2guY29tAAAAIFkxn+c5Wc584z28/I0J5YrxCLQYpHFFntd/PY5FcuEMAAAABHNzaDo= ivan+token2-mini-274@szkiba.hu
+sk-ssh-ed25519@openssh.com AAAAGnNrLXNzaC1lZDI1NTE5QG9wZW5zc2guY29tAAAAIIHZFHobABT2WG8PForxe2qcDV4JFVRop7hZl+twiJfUAAAABHNzaDo= ivan+token2-mini-348@szkiba.hu

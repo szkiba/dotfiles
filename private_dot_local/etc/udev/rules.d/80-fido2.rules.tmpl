@@ -1,0 +1,6 @@
+
+# Install: sudo ln -s ~/.local/etc/udev/rules.d/80-fido2.rules /etc/udev/rules.d/80-fido2.rules
+# Reload: sudo udevadm control --reload
+
+# FIDO key insert/remove -> run udev-fido2.sh (YubiKey OTP+FIDO+CCID, YubiKey FIDO, TOKEN2)
+ACTION=="bind|unbind", SUBSYSTEM=="hid", ENV{HID_NAME}=="Yubico YubiKey OTP+FIDO+CCID|Yubico YubiKey FIDO|TOKEN2 FIDO2 Security Key*", RUN+="/bin/su {{ .chezmoi.username }} --command='{{ .chezmoi.homeDir }}/.local/bin/udev-fido2.sh'"
