@@ -27,3 +27,13 @@ This directory contains public SSH keys and related SSH configuration files.
 | `config`, `config.d/` | SSH client configuration. |
 | `authorized_keys` | Public keys permitted to log in to this account. |
 | `known_hosts` | Recorded host key fingerprints. |
+
+## Note
+
+Use following to detect virtual machine in .tmpl files:
+
+```
+{{- $virt := output "sh" "-c" "command -v systemd-detect-virt >/dev/null 2>&1 && (systemd-detect-virt || true) || echo none" | trim -}}
+{{- if ne $virt "none" }}
+{{- end }}
+```

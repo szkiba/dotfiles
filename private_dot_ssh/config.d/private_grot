@@ -1,3 +1,3 @@
 Host grot
     HostName grot
-    ForwardAgent yes
+    Tag local-vm
