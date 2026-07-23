@@ -2,11 +2,12 @@
 # PKCS11Provider /usr/lib/x86_64-linux-gnu/pkcs11/libtpm2_pkcs11.so
 # PKCS11Provider /usr/lib/x86_64-linux-gnu/libykcs11.so
 
-Match tagged local-vm
-    ForwardAgent yes
-    ControlMaster auto
-    ControlPath /run/user/%i/ssh-%C
-    ControlPersist yes
+# Uncomment after Ubuntu upgrade
+#Match tagged local-vm
+#    ForwardAgent yes
+#    ControlMaster auto
+#    ControlPath /run/user/%i/ssh-%C
+#    ControlPersist yes
 
 Include config.d/*
 

@@ -1,3 +1,6 @@
 Host pet
     HostName pet
-    Tag local-vm
+    ForwardAgent yes
+    ControlMaster auto
+    ControlPath /run/user/%i/ssh-%C
+    ControlPersist yes
