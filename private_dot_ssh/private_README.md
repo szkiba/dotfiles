@@ -14,7 +14,6 @@ This directory contains public SSH keys and related SSH configuration files.
 | `yubikey-192.pub` | YubiKey 192 FIDO2 (resident) | ED25519-SK |
 | `yubikey-226.pub` | YubiKey 226 FIDO2 (resident) | ED25519-SK |
 | `yubikey-blue.pub` | YubiKey security key (blue) | ED25519-SK |
-| `yubikey-blue-aux.pub` | YubiKey security key (blue) — auxiliary key | ED25519-SK |
 | `yubikey-gpg.pub` | YubiKey GPG SSH key | ED25519 |
 | `token2-mini-274.pub` | Token2 mini FIDO2 security key (resident) | ED25519-SK |
 | `token2-mini-348.pub` | Token2 mini FIDO2 security key (resident) | ED25519-SK |
