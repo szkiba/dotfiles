@@ -1,0 +1,7 @@
+[Desktop Entry]
+Type=Application
+Name=SSH FIDO2 key loader
+Comment=Load resident FIDO2 SSH keys already plugged in at login
+Exec=/home/iszkiba/.local/bin/udev-fido2.sh
+X-GNOME-Autostart-enabled=true
+NoDisplay=true
