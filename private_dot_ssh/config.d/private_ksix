@@ -1,6 +1,0 @@
-Host ksix
-    HostName ksix
-    ForwardAgent yes
-    ControlMaster auto
-    ControlPath /run/user/%i/ssh-%C
-    ControlPersist yes

@@ -1,6 +1,0 @@
-Host pet
-    HostName pet
-    ForwardAgent yes
-    ControlMaster auto
-    ControlPath /run/user/%i/ssh-%C
-    ControlPersist yes

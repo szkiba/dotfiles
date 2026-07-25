@@ -1,4 +1,0 @@
-Host pi pi.local
-    HostName pi.local
-    User iszkiba
-    ForwardAgent yes
