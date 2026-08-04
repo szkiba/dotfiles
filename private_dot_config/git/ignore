@@ -6,6 +6,7 @@
 .envrc.private
 RCS
 *,v
+.jj
 
 **/.claude/settings.local.json
 .codex/
