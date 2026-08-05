@@ -2,6 +2,6 @@
 Type=Application
 Name=SSH TPM key loader
 Comment=Load this machine's TPM sealed SSH key into ssh-tpm-agent at login
-Exec=/home/iszkiba/.local/bin/add-tpm-keys.sh
+Exec={{ .chezmoi.homeDir }}/.local/bin/add-tpm-keys.sh
 X-GNOME-Autostart-enabled=true
 NoDisplay=true
