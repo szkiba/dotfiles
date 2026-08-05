@@ -1,0 +1,9 @@
+Host github.com
+    User git
+
+# Use the TPM key when this machine's agent socket and key are both present;
+# otherwise fall through to $SSH_AUTH_SOCK (gnome-keyring, FIDO2).
+Match host github.com exec "test -S /run/user/%i/ssh-tpm-agent.sock && test -f ~/.ssh/key-tpm-%l.pub"
+    IdentityAgent /run/user/%i/ssh-tpm-agent.sock
+    IdentityFile ~/.ssh/key-tpm-%l.pub
+    IdentitiesOnly yes
