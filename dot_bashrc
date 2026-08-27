@@ -4,6 +4,12 @@ case $- in
     *) return;;
 esac
 
+# Inside sandbox.sh's bwrap, unprivileged user-namespace remapping makes
+# /etc/ssh/ssh_config.d/*.conf appear owned by nobody, so ssh refuses to
+# read it (openssh's Include ownership check). Skip the system config for
+# git's own ssh calls; your own ~/.ssh/config keeps its real ownership.
+[ -n "$SANDBOX_NAME" ] && export GIT_SSH_COMMAND='ssh -F ~/.ssh/config'
+
 # Install oh-my-bash on-demand.
 export OSH="$HOME/.oh-my-bash"
 
