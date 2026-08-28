@@ -1,13 +1,15 @@
 #!/bin/bash
 
-export DISPLAY=:0
-export DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/$(id -u)/bus
+export PATH="$HOME/.local/bin:$HOME/go/bin:/usr/local/bin:$PATH"
+# export SSH_AUTH_SOCK="/run/user/$(id -u)/ssh-tpm-agent.sock"
 export SSH_TPM_AUTH_SOCK=/run/user/$(id -u)/ssh-tpm-agent.sock
+export DBUS_SESSION_BUS_ADDRESS="unix:path=/run/user/$(id -u)/bus"
+export DISPLAY="${DISPLAY:-:0}"
 
-prog=$(basename $0)
-cd $(dirname $0)
+prog=$(basename "$0")
+cd "$(dirname "$0")" || exit 1
 
-exec > >(logger -i -s -p user.info -t $prog)
+exec > >(logger -i -s -p user.info -t "$prog")
 exec 2>&1
 
 # ssh-tpm-agent already loads ~/.ssh/*.tpm at startup; this covers the case where
@@ -21,7 +23,7 @@ fi
 
 # ssh-tpm-add never asks for the key passphrase; the agent does, on first signing.
 if ssh-tpm-add "$key" </dev/null; then
-  notify-send "Added TPM SSH key $(basename $key)"
+  notify-send "Added TPM SSH key $(basename "$key")"
 else
   notify-send -u critical --icon security-high "Failed to add TPM SSH key, check logs!"
 fi

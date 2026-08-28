@@ -1,0 +1,6 @@
+[Unit]
+Description=Reload SSH FIDO2 keys on hardware event
+
+[Service]
+Type=oneshot
+ExecStart=%h/.local/bin/udev-fido2.sh

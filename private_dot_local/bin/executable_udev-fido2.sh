@@ -1,23 +1,23 @@
 #!/bin/bash
 
-export DISPLAY=:0
-export DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/$(id -u)/bus
-
-prog=$(basename $0)
-cd $(dirname $0)
-
-exec > >(logger -i -s -p user.info -t $prog)
-exec 2>&1
+export PATH="$HOME/.local/bin:$HOME/go/bin:/usr/local/bin:$PATH"
+export DBUS_SESSION_BUS_ADDRESS="unix:path=/run/user/$(id -u)/bus"
+export SSH_AUTH_SOCK="/run/user/$(id -u)/gcr/ssh"
 
 export SSH_ASKPASS_REQUIRE=force 
 export SSH_ASKPASS=/usr/lib/openssh/gnome-ssh-askpass
 export GNOME_SSH_ASKPASS_GRAB_SERVER=true
-export SSH_AUTH_SOCK="/run/user/$(id -u)/keyring/ssh"
+
+prog=$(basename "$0")
+cd "$(dirname "$0")" || exit 1
+
+exec > >(logger -i -s -p user.info -t "$prog")
+exec 2>&1
 
 # udev fires once per HID interface; act only on input0 to avoid duplicate runs.
 # ACTION unset => manual/autostart run, skip the filter.
 if [[ -n "$ACTION" && "$HID_PHYS" != *input0 ]] ; then
-   exit 0
+  exit 0
 fi
 
 # Any key change (plug or unplug): flush the agent, then reload resident keys.
