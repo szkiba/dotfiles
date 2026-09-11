@@ -24,9 +24,6 @@ priority, and avoids storing a stale user.signingkey in ~/.gitconfig.
 [init]
 	defaultBranch = main
 
-[url "git@github.com:"]
-	insteadOf = https://github.com/
-
 {{- if includeTemplate "isVirtual" . }}
 
 [url "https://github.com/"]
@@ -36,6 +33,10 @@ priority, and avoids storing a stale user.signingkey in ~/.gitconfig.
         helper = !gh auth git-credential
 [credential "https://gist.github.com"]
         helper = !gh auth git-credential
+{{ else }}
+
+[url "git@github.com:"]
+	insteadOf = https://github.com/
 {{- end }}
 
 [gpg]
