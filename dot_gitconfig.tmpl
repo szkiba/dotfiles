@@ -27,6 +27,17 @@ priority, and avoids storing a stale user.signingkey in ~/.gitconfig.
 [url "git@github.com:"]
 	insteadOf = https://github.com/
 
+{{- if includeTemplate "isVirtual" . }}
+
+[url "https://github.com/"]
+	insteadOf = git@github.com:
+
+[credential "https://github.com"]
+        helper = !gh auth git-credential
+[credential "https://gist.github.com"]
+        helper = !gh auth git-credential
+{{- end }}
+
 [gpg]
 	format = ssh
 

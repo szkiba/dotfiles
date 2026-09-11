@@ -1,0 +1,25 @@
+{{- /*
+Reports whether the current machine is a container or VM, rather than bare
+metal.
+
+Prefers systemd-detect-virt where available: it covers container runtimes
+(docker, podman, lxc — Incus containers are LXC under the hood) and VM
+hypervisors (kvm, qemu, vmware, ...) in a single check.
+
+Alpine and other non-systemd systems have no systemd-detect-virt, so this
+also checks markers that don't depend on systemd:
+- Docker container: /.dockerenv
+- Podman container: /run/.containerenv
+- Incus container: the Incus API socket at /dev/incus/sock
+- Incus VM: SMBIOS board vendor/name set to "LinuxContainers"/"Incus"
+- Other hypervisors' VMs: SMBIOS system vendor matching a known hypervisor
+
+Usage: {{ if includeTemplate "isVirtual" . }}...{{ end }}
+*/ -}}
+{{- $hypervisorVendors := list "QEMU" "innotek GmbH" "VMware, Inc." "Microsoft Corporation" "Xen" "Amazon EC2" "Google" "Bochs" "Parallels Software International Inc." -}}
+{{- $sysVendor := output "sh" "-c" "cat /sys/class/dmi/id/sys_vendor 2>/dev/null || true" | trim -}}
+{{- $boardVendor := output "sh" "-c" "cat /sys/class/dmi/id/board_vendor 2>/dev/null || true" | trim -}}
+{{- $boardName := output "sh" "-c" "cat /sys/class/dmi/id/board_name 2>/dev/null || true" | trim -}}
+{{- $viaSystemd := and (lookPath "systemd-detect-virt") (eq (output "sh" "-c" "systemd-detect-virt -q && echo true || echo false" | trim) "true") -}}
+{{- $isVirtual := or $viaSystemd (stat "/.dockerenv") (stat "/run/.containerenv") (stat "/dev/incus/sock") (and (eq $boardVendor "LinuxContainers") (eq $boardName "Incus")) (has $sysVendor $hypervisorVendors) -}}
+{{- if $isVirtual }}true{{ end -}}
