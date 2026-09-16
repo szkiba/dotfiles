@@ -20,6 +20,19 @@ if [[ -n "$ACTION" && "$HID_PHYS" != *input0 ]] ; then
   exit 0
 fi
 
+# Some scans (e.g. KeepassXC) cause a full unbind/remove/add/bind re-enum
+# without a real unplug, firing this script twice within well under a second.
+# Debounce: skip if the last run started less than 2s ago.
+lock=/run/user/$(id -u)/fido2-reload.lock
+exec 9>>"$lock"
+flock 9
+last=$(stat -c %Y "$lock" 2>/dev/null || echo 0)
+now=$(date +%s)
+if (( now - last < 2 )); then
+  exit 0
+fi
+touch "$lock"
+
 # Any key change (plug or unplug): flush the agent, then reload resident keys.
 # ssh-add -K needs a touch per authenticator, so touch the key you want to keep.
 # Remove only FIDO2 (sk-*) keys; leave any regular keys in the agent alone.
