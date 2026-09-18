@@ -10,3 +10,11 @@ RCS
 
 **/.claude/settings.local.json
 .codex/
+
+# Personal Devbox tooling
+devbox.json
+devbox.lock
+.devbox/
+
+# Personal Jujutsu (jj) metadata
+.jj/
