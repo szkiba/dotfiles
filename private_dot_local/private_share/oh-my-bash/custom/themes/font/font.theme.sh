@@ -82,12 +82,12 @@ _omb_theme_detect_context() {
 
 _omb_theme_ctx="$(_omb_theme_detect_context)"
 case "$_omb_theme_ctx" in
-    sandbox)   _OMB_CTX_ICON="🛡️" ;;
+    sandbox)   _OMB_CTX_ICON="🔒" ;;
     distrobox) _OMB_CTX_ICON="🧰" ;;
     docker)    _OMB_CTX_ICON="🐳" ;;
     podman)    _OMB_CTX_ICON="🦭" ;;
     incus)     _OMB_CTX_ICON="📦" ;;
-    vm)        _OMB_CTX_ICON="🖥️" ;;
+    vm)        _OMB_CTX_ICON="💻" ;;
     ssh)       _OMB_CTX_ICON="🌐" ;;
     *)         _OMB_CTX_ICON="" ;;
 esac
