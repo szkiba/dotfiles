@@ -102,12 +102,15 @@ esac
 
 # Distrobox rewrites /etc/hostname to "<box-name>.<host>" so \h happens to
 # show the box name too, but that's a contested hack (see distrobox#62) --
-# use its own $CONTAINER_ID identifier instead. Same idea for a bwrap
-# sandbox: show $SANDBOX_HOST instead of the underlying machine's \h.
+# show "\h#$CONTAINER_ID" instead, so the real host and the box name are
+# both visible without depending on that hack. Same idea for a bwrap
+# sandbox: show "$SANDBOX_HOST#$SANDBOX_NAME" instead of plain \h.
 _OMB_CTX_HOST='\h'
 case "$_omb_theme_ctx" in
-    sandbox)   _OMB_CTX_HOST="$SANDBOX_HOST" ;;
-    distrobox) _OMB_CTX_HOST="$CONTAINER_ID" ;;
+    sandbox)   _OMB_CTX_HOST="${SANDBOX_HOST}#${SANDBOX_NAME}" ;;
+    distrobox) _OMB_CTX_HOST="\h#$CONTAINER_ID" ;;
+    incus)     _OMB_CTX_HOST="${INCUS_HOST:-\h}#$CONTAINER_ID" ;;
+    devbox)    _OMB_CTX_HOST="\h#$(basename "$DEVBOX_PROJECT_ROOT")" ;;
 esac
 
 unset -f _omb_theme_detect_context
