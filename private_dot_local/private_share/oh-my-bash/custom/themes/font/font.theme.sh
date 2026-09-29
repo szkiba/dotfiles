@@ -29,8 +29,8 @@ _omb_theme_detect_context() {
         return
     fi
 
-    # A devbox (nix) shell doesn't change the hostname or namespace, just
-    # this env var -- badge only, no _OMB_CTX_HOST override for it.
+    # A devbox (nix) shell doesn't change the namespace, just this env
+    # var -- see below for how it still gets its own _OMB_CTX_HOST.
     if [[ -n "$DEVBOX_PROJECT_ROOT" ]]; then
         echo "devbox"
         return
@@ -100,17 +100,26 @@ case "$_omb_theme_ctx" in
     *)         _OMB_CTX_ICON="" ;;
 esac
 
-# Distrobox rewrites /etc/hostname to "<box-name>.<host>" so \h happens to
-# show the box name too, but that's a contested hack (see distrobox#62) --
-# show "\h#$CONTAINER_ID" instead, so the real host and the box name are
-# both visible without depending on that hack. Same idea for a bwrap
-# sandbox: show "$SANDBOX_HOST#$SANDBOX_NAME" instead of plain \h.
+# Plain \h alone is rarely enough context in these cases -- distrobox
+# rewrites /etc/hostname to "<box-name>.<host>" so \h happens to show the
+# box name too, but that's a contested hack (see distrobox#62); a bwrap
+# sandbox, a devbox shell, and an Incus container/VM each have their own
+# separate identity that \h doesn't reflect at all. So each shows two
+# pieces of identity joined by a yellow "#":
+#   sandbox    "$SANDBOX_HOST#$SANDBOX_NAME"
+#   distrobox  "\h#$CONTAINER_ID"                 (real host, then box name)
+#   devbox     "\h#<devbox project dir name>"      (real host, then project)
+#   incus/vm   "$INCUS_HOST#\h"                    (physical host, then \h)
+# $INCUS_HOST is opt-in, not provided by Incus itself: set it per-instance
+# with `incus config set <instance> environment.INCUS_HOST=$(hostname)` on
+# the Incus host. Left unset, it just collapses to "#\h" for both.
 _OMB_CTX_HOST='\h'
 case "$_omb_theme_ctx" in
     sandbox)   _OMB_CTX_HOST="${SANDBOX_HOST}${_omb_prompt_bold_yellow}#${SANDBOX_NAME}" ;;
     distrobox) _OMB_CTX_HOST="\h${_omb_prompt_bold_yellow}#$CONTAINER_ID" ;;
     incus)     _OMB_CTX_HOST="${INCUS_HOST}${_omb_prompt_bold_yellow}#\h" ;;
     devbox)    _OMB_CTX_HOST="\h${_omb_prompt_bold_yellow}#$(basename "$DEVBOX_PROJECT_ROOT")" ;;
+    vm)        [[ -n "$INCUS_HOST" ]] && _OMB_CTX_HOST="${INCUS_HOST}${_omb_prompt_bold_yellow}#\h" || _OMB_CTX_HOST="${_omb_prompt_bold_yellow}#\h" ;;
 esac
 
 unset -f _omb_theme_detect_context
