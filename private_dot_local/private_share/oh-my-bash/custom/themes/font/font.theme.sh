@@ -31,10 +31,14 @@ _omb_theme_detect_context() {
 
     local virt=""
     if command -v systemd-detect-virt &>/dev/null; then
+        # Authoritative: trust "none" as-is, don't fall through to the file
+        # markers below -- /dev/incus/sock exists on Incus VMs too, not
+        # just containers, so it would otherwise wrongly override a
+        # confirmed "not a container" answer.
         virt="$(systemd-detect-virt -c 2>/dev/null)"
         [[ "$virt" == "none" ]] && virt=""
-    fi
-    if [[ -z "$virt" ]]; then
+    else
+        # No systemd-detect-virt (e.g. Alpine) -- only source of truth left.
         if [[ -e /.dockerenv ]]; then
             virt="docker"
         elif [[ -e /run/.containerenv ]]; then
