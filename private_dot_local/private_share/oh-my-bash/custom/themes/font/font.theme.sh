@@ -2,16 +2,26 @@
 #
 # Override for the built-in "font" theme: drops the python-venv/spack-env
 # prefix, keeping just time/user@host/pwd/git/status-arrow, and adds a
-# shell-context badge (distrobox/docker/podman/incus/vm/ssh) next to
-# user@host.
+# shell-context badge (sandbox/distrobox/docker/podman/incus/vm/ssh) next
+# to user@host.
 
 source "$OSH/themes/font/font.theme.sh"
 
 # Detect the kind of shell context once per shell (not per prompt render):
-# local | distrobox | docker | podman | incus | vm | ssh. Mirrors the
-# container/VM markers already vetted in .chezmoitemplates/isVirtual, for
-# consistency across the repo.
+# local | sandbox | distrobox | docker | podman | incus | vm | ssh. "incus"
+# is an Incus/LXD *container* specifically; an Incus-orchestrated VM falls
+# under the generic "vm" bucket so container vs VM stays visually distinct.
+# Container/VM markers mirror those already vetted in
+# .chezmoitemplates/isVirtual, for consistency across the repo.
 _omb_theme_detect_context() {
+    # sandbox.sh's bubblewrap sandbox sets this; nothing else (namespaces
+    # alone) marks it, so this env var is the only signal. Checked first
+    # since it can wrap any of the other contexts below.
+    if [[ -n "$SANDBOX_NAME" ]]; then
+        echo "sandbox"
+        return
+    fi
+
     # Distrobox layers on top of a plain docker/podman container and can
     # only be told apart via this env var it exports inside the box.
     if [[ -n "$CONTAINER_ID" ]]; then
@@ -39,14 +49,9 @@ _omb_theme_detect_context() {
         lxc)    echo "incus";  return ;;
     esac
 
-    # Not a container. Incus VMs are SMBIOS-tagged; bucket them with the
-    # incus container badge since they're still "an Incus instance".
-    if [[ "$(cat /sys/class/dmi/id/board_vendor 2>/dev/null)" == "LinuxContainers" &&
-          "$(cat /sys/class/dmi/id/board_name 2>/dev/null)" == "Incus" ]]; then
-        echo "incus"
-        return
-    fi
-
+    # Not a container -- check for a VM (including Incus-orchestrated ones,
+    # which get the plain vm badge too: container vs VM stays visually
+    # distinct regardless of who's orchestrating it).
     local vm=""
     if command -v systemd-detect-virt &>/dev/null; then
         vm="$(systemd-detect-virt -v 2>/dev/null)"
@@ -73,6 +78,7 @@ _omb_theme_detect_context() {
 
 _omb_theme_ctx="$(_omb_theme_detect_context)"
 case "$_omb_theme_ctx" in
+    sandbox)   _OMB_CTX_ICON="🛡️" ;;
     distrobox) _OMB_CTX_ICON="🧰" ;;
     docker)    _OMB_CTX_ICON="🐳" ;;
     podman)    _OMB_CTX_ICON="🦭" ;;
@@ -84,9 +90,13 @@ esac
 
 # Distrobox rewrites /etc/hostname to "<box-name>.<host>" so \h happens to
 # show the box name too, but that's a contested hack (see distrobox#62) --
-# use its own $CONTAINER_ID identifier instead of relying on it.
+# use its own $CONTAINER_ID identifier instead. Same idea for a bwrap
+# sandbox: show $SANDBOX_NAME instead of the underlying machine's \h.
 _OMB_CTX_HOST='\h'
-[[ "$_omb_theme_ctx" == distrobox ]] && _OMB_CTX_HOST="$CONTAINER_ID"
+case "$_omb_theme_ctx" in
+    sandbox)   _OMB_CTX_HOST="$SANDBOX_NAME" ;;
+    distrobox) _OMB_CTX_HOST="$CONTAINER_ID" ;;
+esac
 
 unset -f _omb_theme_detect_context
 unset _omb_theme_ctx
