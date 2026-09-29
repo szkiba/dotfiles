@@ -17,6 +17,10 @@ if [ ! -d "$OSH" ] ; then
   git clone -q https://github.com/ohmybash/oh-my-bash.git "$OSH"
 fi
 
+# Keep custom themes/plugins/aliases/completions in chezmoi instead of
+# inside the git-cloned (and thus dotfiles-untracked) $OSH tree.
+export OSH_CUSTOM="${XDG_DATA_HOME:-$HOME/.local/share}/oh-my-bash/custom"
+
 # Set name of the theme to load. Optionally, if you set this to "random"
 # it'll load a random theme each time that oh-my-bash is loaded.
 OSH_THEME="font"
@@ -27,7 +31,7 @@ THEME_SHOW_CLOCK="false"
 OMB_USE_SUDO=false
 
 # Which completions would you like to load? (completions can be found in ~/.oh-my-bash/completions/*)
-# Custom completions may be added to ~/.oh-my-bash/custom/completions/
+# Custom completions may be added to $OSH_CUSTOM/completions/
 # Example format: completions=(ssh git bundler gem pip pip3)
 # Add wisely, as too many completions slow down shell startup.
 completions=(
@@ -37,154 +41,48 @@ completions=(
 )
 
 # Which aliases would you like to load? (aliases can be found in ~/.oh-my-bash/aliases/*)
-# Custom aliases may be added to ~/.oh-my-bash/custom/aliases/
+# Custom aliases may be added to $OSH_CUSTOM/aliases/
 # Example format: aliases=(vagrant composer git-avh)
 # Add wisely, as too many aliases slow down shell startup.
 aliases=(
   general
+  mine
 )
 
 # Which plugins would you like to load? (plugins can be found in ~/.oh-my-bash/plugins/*)
-# Custom plugins may be added to ~/.oh-my-bash/custom/plugins/
+# Custom plugins may be added to $OSH_CUSTOM/plugins/
 # Example format: plugins=(rails git textmate ruby lighthouse)
 # Add wisely, as too many plugins slow down shell startup.
 plugins=(
   git
   bashmarks
+  code-remote
 )
 
-# Which plugins would you like to conditionally load? (plugins can be found in ~/.oh-my-bash/plugins/*)
-# Custom plugins may be added to ~/.oh-my-bash/custom/plugins/
-# Example format:
-#  if [ "$DISPLAY" ] || [ "$SSH" ]; then
-#      plugins+=(tmux-autoattach)
-#  fi
-
+# oh-my-bash's core lib unconditionally aliases cd to its own directory-
+# tracking wrapper (_omb_directories_cd); restore the plain builtin.
 [[ -s "$OSH/oh-my-bash.sh" ]] && source "$OSH/oh-my-bash.sh" && unalias cd
 
 export LS_COLORS="$LS_COLORS:*,v=2;30"
 
+# Opt out of Homebrew's telemetry, then load its env (PATH, MANPATH, ...) if installed.
 export HOMEBREW_NO_ANALYTICS=1
 [[ -x /home/linuxbrew/.linuxbrew/bin/brew ]] && eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)"
 
+# Auto-load/unload per-directory .envrc files, if direnv is installed.
 if direnv --version >/dev/null 2>&1 ; then
   eval "$(direnv hook bash)"
 fi
 
+# Machine-local secrets, not tracked in dotfiles.
 [ -r ~/.secrets.env ] && . ~/.secrets.env
 
-# [[ -s "$HOME/.gvm/scripts/gvm" ]] && source "$HOME/.gvm/scripts/gvm"
+# Detect and export $EDITOR.
+. ~/.config/bash/editor.sh
 
-if xset -q >/dev/null 2>&1 ; then
-  if codium --version > /dev/null 2>&1; then
-    export EDITOR="codium -n -w"
-  elif code --version > /dev/null 2>&1; then
-    export EDITOR="code -w"
-  elif geany --version > /dev/null 2>&1; then
-    export EDITOR="geany"
-  elif gedit --version > /dev/null 2>&1; then
-    export EDITOR="gedit"
-  fi
-fi
-if [ -z "$EDITOR" ]; then
-  if hx --version >/dev/null 2>&1; then
-    export EDITOR=hx
-  elif nvim --version >/dev/null 2>&1; then
-    export EDITOR=nvim
-  elif vim --version >/dev/null 2>&1; then
-    export EDITOR=vim
-  else
-    export EDITOR=vi
-  fi
-fi
-
-alias cz='chezmoi'
-alias v='vscli open'
-
-function _omb_theme_PROMPT_COMMAND() {
-    # This needs to be first to save last command return code
-    local RC="$?"
-
-    local hostname="${_omb_prompt_bold_gray}\u@${_omb_prompt_bold_magenta}\h"
-    local venv
-
-    # Set return status color
-    if [[ ${RC} == 0 ]]; then
-        ret_status="${_omb_prompt_bold_green}"
-    else
-        ret_status="${_omb_prompt_bold_brown}"
-    fi
-
-    # Append new history lines to history file
-    history -a
-
-    PS1="$(clock_prompt)${hostname} ${_omb_prompt_bold_teal}\W $(scm_prompt_char_info)${ret_status}→ ${_omb_prompt_normal}"
-  }
-
+# Only set when the CloudBox sync has actually delivered the vault key.
 if [ -f ~/Documents/CloudBox/keys/ansible-vault-password ]; then
   export ANSIBLE_VAULT_PASSWORD_FILE=$HOME/Documents/CloudBox/keys/ansible-vault-password
 fi
 
-[ -s ~/.vscode/code.sh ] && . ~/.vscode/code.sh
-
 unset PAGER
-
-# Open a machine over Remote-SSH: a folder, or one of its generated workspaces.
-#   c ksix            -> /code/ksix                        (whole machine)
-#   c ksix protocol   -> workspaces/protocol.code-workspace (tagged repos + own TEMP)
-c() {
-    local machine=$1 ws=${2%.code-workspace} dir target
-
-    if [ -z "$machine" ]; then
-        echo "usage: c <machine> [workspace]" >&2
-        return 1
-    fi
-
-    dir="/code/$machine"
-    # A local check: /code/<machine> is the host-side worktree, not a remote path.
-    if [ ! -d "$dir" ]; then
-        echo "c: no such machine: $dir" >&2
-        return 1
-    fi
-
-    # Remote-SSH against a stopped machine hangs instead of failing.
-    if command -v incus >/dev/null 2>&1 &&
-       [ "$(incus list "$machine" -c s --format csv 2>/dev/null)" != RUNNING ]; then
-        echo "c: $machine is not running — (cd $dir && make up)" >&2
-        return 1
-    fi
-
-    target=$dir
-    if [ -n "$ws" ]; then
-        target="$dir/workspaces/$ws.code-workspace"
-        if [ ! -f "$target" ]; then
-            echo "c: no workspace '$ws' in $machine. available:" >&2
-            ls "$dir/workspaces" 2>/dev/null | sed 's/\.code-workspace$//;s/^/  /' >&2
-            return 1
-        fi
-    fi
-
-    code --remote "ssh-remote+$machine" "$target"
-}
-
-# Completion for c: machines from /code, then that machine's generated workspaces.
-_c() {
-    local cur=${COMP_WORDS[COMP_CWORD]} d w names=()
-
-    case $COMP_CWORD in
-        1)  # A machine is a worktree of this repo, which bin/up.sh identifies.
-            # /code holds unrelated directories too, and ~/.ssh/config.d holds
-            # unrelated hosts, so neither is a usable list on its own.
-            for d in /code/*/; do
-                [ -f "$d/bin/up.sh" ] && names+=("$(basename "$d")")
-            done ;;
-        2)  # Workspaces of the machine already typed, if it has any.
-            for w in "/code/${COMP_WORDS[1]}/workspaces"/*.code-workspace; do
-                [ -f "$w" ] && names+=("$(basename "$w" .code-workspace)")
-            done ;;
-        *)  return ;;
-    esac
-
-    COMPREPLY=($(compgen -W "${names[*]}" -- "$cur"))
-}
-complete -F _c c
