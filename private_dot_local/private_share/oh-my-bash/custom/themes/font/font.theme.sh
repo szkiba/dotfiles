@@ -17,7 +17,7 @@ _omb_theme_detect_context() {
     # sandbox.sh's bubblewrap sandbox sets this; nothing else (namespaces
     # alone) marks it, so this env var is the only signal. Checked first
     # since it can wrap any of the other contexts below.
-    if [[ -n "$SANDBOX_NAME" ]]; then
+    if [[ -n "$SANDBOX_HOST" ]]; then
         echo "sandbox"
         return
     fi
@@ -103,10 +103,10 @@ esac
 # Distrobox rewrites /etc/hostname to "<box-name>.<host>" so \h happens to
 # show the box name too, but that's a contested hack (see distrobox#62) --
 # use its own $CONTAINER_ID identifier instead. Same idea for a bwrap
-# sandbox: show $SANDBOX_NAME instead of the underlying machine's \h.
+# sandbox: show $SANDBOX_HOST instead of the underlying machine's \h.
 _OMB_CTX_HOST='\h'
 case "$_omb_theme_ctx" in
-    sandbox)   _OMB_CTX_HOST="$SANDBOX_NAME" ;;
+    sandbox)   _OMB_CTX_HOST="$SANDBOX_HOST" ;;
     distrobox) _OMB_CTX_HOST="$CONTAINER_ID" ;;
 esac
 
