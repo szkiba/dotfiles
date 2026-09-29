@@ -107,10 +107,10 @@ esac
 # sandbox: show "$SANDBOX_HOST#$SANDBOX_NAME" instead of plain \h.
 _OMB_CTX_HOST='\h'
 case "$_omb_theme_ctx" in
-    sandbox)   _OMB_CTX_HOST="${SANDBOX_HOST}#${SANDBOX_NAME}" ;;
-    distrobox) _OMB_CTX_HOST="\h#$CONTAINER_ID" ;;
-    incus)     _OMB_CTX_HOST="${INCUS_HOST}#\h" ;;
-    devbox)    _OMB_CTX_HOST="\h#$(basename "$DEVBOX_PROJECT_ROOT")" ;;
+    sandbox)   _OMB_CTX_HOST="${SANDBOX_HOST}${_omb_prompt_bold_yellow}#${SANDBOX_NAME}" ;;
+    distrobox) _OMB_CTX_HOST="\h${_omb_prompt_bold_yellow}#$CONTAINER_ID" ;;
+    incus)     _OMB_CTX_HOST="${INCUS_HOST}${_omb_prompt_bold_yellow}#\h" ;;
+    devbox)    _OMB_CTX_HOST="\h${_omb_prompt_bold_yellow}#$(basename "$DEVBOX_PROJECT_ROOT")" ;;
 esac
 
 unset -f _omb_theme_detect_context
