@@ -2,14 +2,14 @@
 #
 # Override for the built-in "font" theme: drops the python-venv/spack-env
 # prefix, keeping just time/user@host/pwd/git/status-arrow, and adds a
-# shell-context badge (sandbox/distrobox/docker/podman/incus/vm/ssh) next
-# to user@host.
+# shell-context badge (sandbox/distrobox/devbox/docker/podman/incus/vm/ssh)
+# next to user@host.
 
 source "$OSH/themes/font/font.theme.sh"
 
 # Detect the kind of shell context once per shell (not per prompt render):
-# local | sandbox | distrobox | docker | podman | incus | vm | ssh. "incus"
-# is an Incus/LXD *container* specifically; an Incus-orchestrated VM falls
+# local | sandbox | distrobox | devbox | docker | podman | incus | vm | ssh.
+# "incus" is an Incus/LXD *container* specifically; an Incus-orchestrated VM falls
 # under the generic "vm" bucket so container vs VM stays visually distinct.
 # Container/VM markers mirror those already vetted in
 # .chezmoitemplates/isVirtual, for consistency across the repo.
@@ -26,6 +26,13 @@ _omb_theme_detect_context() {
     # only be told apart via this env var it exports inside the box.
     if [[ -n "$CONTAINER_ID" ]]; then
         echo "distrobox"
+        return
+    fi
+
+    # A devbox (nix) shell doesn't change the hostname or namespace, just
+    # this env var -- badge only, no _OMB_CTX_HOST override for it.
+    if [[ -n "$DEVBOX_PROJECT_ROOT" ]]; then
+        echo "devbox"
         return
     fi
 
@@ -84,6 +91,7 @@ _omb_theme_ctx="$(_omb_theme_detect_context)"
 case "$_omb_theme_ctx" in
     sandbox)   _OMB_CTX_ICON="🔒" ;;
     distrobox) _OMB_CTX_ICON="📥" ;;
+    devbox)    _OMB_CTX_ICON="🥡" ;;
     docker)    _OMB_CTX_ICON="🐳" ;;
     podman)    _OMB_CTX_ICON="🦭" ;;
     incus)     _OMB_CTX_ICON="📦" ;;
