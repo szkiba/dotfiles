@@ -98,16 +98,29 @@ unset _omb_theme_ctx
 # -- their env vars can be set at the same time as being in a VM, an Incus
 # container, over ssh, etc. (e.g. a distrobox created inside a VM). So each
 # composes on top of the base icon/host instead of replacing it, appending
-# its own icon and one more "·segment". Fixed, arbitrary but deterministic
-# order -- sandbox, then distrobox, then devbox -- so the same combination
-# always renders the same way, though it isn't based on actual nesting
-# depth (which isn't detectable).
+# its own icon and one more identity segment. Fixed, arbitrary but
+# deterministic order -- sandbox, then distrobox, then devbox -- so the
+# same combination always renders the same way, though it isn't based on
+# actual nesting depth (which isn't detectable).
 #
+# The very first segment appended after the base host is joined by a
+# plain space, same as \W and the git status below it -- it's the boundary
+# between the base identity and the "extra facts" being tacked on. Every
+# join after that (multiple overlays stacking, or sandbox's own two
+# pieces) uses a yellow "·", since those are all part of the same "extra
+# facts" cluster rather than a new top-level prompt section.
+_omb_ctx_sep=' '
+_omb_ctx_join() {
+    _OMB_CTX_HOST="${_OMB_CTX_HOST}${_omb_ctx_sep}${_omb_prompt_bold_yellow}$1"
+    _omb_ctx_sep="${_omb_prompt_bold_yellow}·"
+}
+
 # sandbox.sh's bubblewrap sandbox sets $SANDBOX_HOST/$SANDBOX_NAME; nothing
 # else (namespaces alone) marks it, so these env vars are the only signal.
 if [[ -n "$SANDBOX_HOST" ]]; then
     _OMB_CTX_ICON="${_OMB_CTX_ICON:+$_OMB_CTX_ICON }🔒"
-    _OMB_CTX_HOST="${_OMB_CTX_HOST}${_omb_prompt_bold_yellow}·${SANDBOX_HOST}${_omb_prompt_bold_yellow}·${SANDBOX_NAME}"
+    _omb_ctx_join "$SANDBOX_HOST"
+    _omb_ctx_join "$SANDBOX_NAME"
 fi
 
 # Distrobox layers on top of a plain docker/podman container and can only
@@ -117,15 +130,18 @@ fi
 # $CONTAINER_ID explicitly instead of relying on it.
 if [[ -n "$CONTAINER_ID" ]]; then
     _OMB_CTX_ICON="${_OMB_CTX_ICON:+$_OMB_CTX_ICON }📥"
-    _OMB_CTX_HOST="${_OMB_CTX_HOST}${_omb_prompt_bold_yellow}·${CONTAINER_ID}"
+    _omb_ctx_join "$CONTAINER_ID"
 fi
 
 # A devbox (nix) shell doesn't change the namespace or hostname at all,
 # just this env var -- append the project dir name as its identity.
 if [[ -n "$DEVBOX_PROJECT_ROOT" ]]; then
     _OMB_CTX_ICON="${_OMB_CTX_ICON:+$_OMB_CTX_ICON }🥡"
-    _OMB_CTX_HOST="${_OMB_CTX_HOST}${_omb_prompt_bold_yellow}·$(basename "$DEVBOX_PROJECT_ROOT")"
+    _omb_ctx_join "$(basename "$DEVBOX_PROJECT_ROOT")"
 fi
+
+unset -f _omb_ctx_join
+unset _omb_ctx_sep
 
 function _omb_theme_PROMPT_COMMAND() {
     # This needs to be first to save last command return code
