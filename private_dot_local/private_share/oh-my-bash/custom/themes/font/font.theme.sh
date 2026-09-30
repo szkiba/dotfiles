@@ -83,11 +83,11 @@ esac
 # own separate identity that \h doesn't reflect at all. $INCUS_HOST is
 # opt-in, not provided by Incus itself: set it per-instance with
 # `incus config set <instance> environment.INCUS_HOST=$(hostname)` on the
-# Incus host. Left unset, it just collapses to "#\h".
+# Incus host. Left unset, there's nothing to join, so no separator is
+# added at all -- just plain \h, same as any other base context.
 _OMB_CTX_HOST='\h'
 case "$_omb_theme_ctx" in
-    incus) _OMB_CTX_HOST="${INCUS_HOST}${_omb_prompt_bold_yellow}#\h" ;;
-    vm)    [[ -n "$INCUS_HOST" ]] && _OMB_CTX_HOST="${INCUS_HOST}${_omb_prompt_bold_yellow}#\h" || _OMB_CTX_HOST="${_omb_prompt_bold_yellow}#\h" ;;
+    incus|vm) [[ -n "$INCUS_HOST" ]] && _OMB_CTX_HOST="${INCUS_HOST}${_omb_prompt_bold_yellow}·\h" ;;
 esac
 
 unset -f _omb_theme_detect_context
@@ -98,7 +98,7 @@ unset _omb_theme_ctx
 # -- their env vars can be set at the same time as being in a VM, an Incus
 # container, over ssh, etc. (e.g. a distrobox created inside a VM). So each
 # composes on top of the base icon/host instead of replacing it, appending
-# its own icon and one more "#segment". Fixed, arbitrary but deterministic
+# its own icon and one more "·segment". Fixed, arbitrary but deterministic
 # order -- sandbox, then distrobox, then devbox -- so the same combination
 # always renders the same way, though it isn't based on actual nesting
 # depth (which isn't detectable).
@@ -107,7 +107,7 @@ unset _omb_theme_ctx
 # else (namespaces alone) marks it, so these env vars are the only signal.
 if [[ -n "$SANDBOX_HOST" ]]; then
     _OMB_CTX_ICON="${_OMB_CTX_ICON:+$_OMB_CTX_ICON }🔒"
-    _OMB_CTX_HOST="${_OMB_CTX_HOST}${_omb_prompt_bold_yellow}#${SANDBOX_HOST}${_omb_prompt_bold_yellow}#${SANDBOX_NAME}"
+    _OMB_CTX_HOST="${_OMB_CTX_HOST}${_omb_prompt_bold_yellow}·${SANDBOX_HOST}${_omb_prompt_bold_yellow}·${SANDBOX_NAME}"
 fi
 
 # Distrobox layers on top of a plain docker/podman container and can only
@@ -117,14 +117,14 @@ fi
 # $CONTAINER_ID explicitly instead of relying on it.
 if [[ -n "$CONTAINER_ID" ]]; then
     _OMB_CTX_ICON="${_OMB_CTX_ICON:+$_OMB_CTX_ICON }📥"
-    _OMB_CTX_HOST="${_OMB_CTX_HOST}${_omb_prompt_bold_yellow}#${CONTAINER_ID}"
+    _OMB_CTX_HOST="${_OMB_CTX_HOST}${_omb_prompt_bold_yellow}·${CONTAINER_ID}"
 fi
 
 # A devbox (nix) shell doesn't change the namespace or hostname at all,
 # just this env var -- append the project dir name as its identity.
 if [[ -n "$DEVBOX_PROJECT_ROOT" ]]; then
     _OMB_CTX_ICON="${_OMB_CTX_ICON:+$_OMB_CTX_ICON }🥡"
-    _OMB_CTX_HOST="${_OMB_CTX_HOST}${_omb_prompt_bold_yellow}#$(basename "$DEVBOX_PROJECT_ROOT")"
+    _OMB_CTX_HOST="${_OMB_CTX_HOST}${_omb_prompt_bold_yellow}·$(basename "$DEVBOX_PROJECT_ROOT")"
 fi
 
 function _omb_theme_PROMPT_COMMAND() {
