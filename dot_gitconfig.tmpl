@@ -24,12 +24,22 @@ priority, and avoids storing a stale user.signingkey in ~/.gitconfig.
 [init]
 	defaultBranch = main
 
+{{- if lookPath "gh" }}
 # Credential helpers
+{{ if and (lookPath "op") (output "sh" "-c" "op plugin list 2>/dev/null | grep -q '^gh\\s' && echo yes || true" | trim | eq "yes") -}}
+
+[credential "https://github.com"]
+	helper = !op plugin run -- gh auth git-credential
+
+[credential "https://gist.github.com"]
+	helper = !op plugin run -- gh auth git-credential
+{{- else }}
 [credential "https://github.com"]
 	helper = !gh auth git-credential
 
 [credential "https://gist.github.com"]
 	helper = !gh auth git-credential
+{{- end }}
 
 # Rewrite SSH to HTTPS for repositories
 [url "https://github.com/"]
@@ -40,7 +50,17 @@ priority, and avoids storing a stale user.signingkey in ~/.gitconfig.
 [url "https://gist.github.com/"]
 	insteadOf = git@gist.github.com:
 	insteadOf = ssh://git@gist.github.com/
-	
+{{- else }}
+
+# Rewrite HTTPS to SSH for repositories
+[url "git@github.com:"]
+	insteadOf = https://github.com/
+
+# Rewrite HTTPS to SSH for Gists
+[url "git@gist.github.com:"]
+	insteadOf = https://gist.github.com/
+{{- end }}
+
 [gpg]
 	format = ssh
 

@@ -85,7 +85,7 @@ if [ -f ~/Documents/CloudBox/keys/ansible-vault-password ]; then
   export ANSIBLE_VAULT_PASSWORD_FILE=$HOME/Documents/CloudBox/keys/ansible-vault-password
 fi
 
-[ -r ~/.config/op/plugins ] && . ~/.config/op/plugins.sh
+[ -r ~/.config/op/plugins.sh ] && . ~/.config/op/plugins.sh
 
 unset PAGER
 unalias c
