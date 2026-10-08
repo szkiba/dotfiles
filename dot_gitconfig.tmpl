@@ -24,21 +24,23 @@ priority, and avoids storing a stale user.signingkey in ~/.gitconfig.
 [init]
 	defaultBranch = main
 
-{{- if includeTemplate "isVirtual" . }}
+# Credential helpers
+[credential "https://github.com"]
+	helper = !gh auth git-credential
 
+[credential "https://gist.github.com"]
+	helper = !gh auth git-credential
+
+# Rewrite SSH to HTTPS for repositories
 [url "https://github.com/"]
 	insteadOf = git@github.com:
+	insteadOf = ssh://git@github.com/
 
-[credential "https://github.com"]
-        helper = !gh auth git-credential
-[credential "https://gist.github.com"]
-        helper = !gh auth git-credential
-{{ else }}
-
-[url "git@github.com:"]
-	insteadOf = https://github.com/
-{{- end }}
-
+# Rewrite SSH to HTTPS for Gists
+[url "https://gist.github.com/"]
+	insteadOf = git@gist.github.com:
+	insteadOf = ssh://git@gist.github.com/
+	
 [gpg]
 	format = ssh
 
