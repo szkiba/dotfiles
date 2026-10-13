@@ -1,0 +1,45 @@
+# chezmoi:template:left-delimiter="[["
+# chezmoi:template:right-delimiter="]]"
+schemaVersion: "1"
+
+args:
+  agent:
+    default: claude
+    enum:
+      - claude
+      - codex
+
+  owner:
+    default: grafana
+    enum:
+      - grafana
+      - [[ .github_user ]]
+
+agent: ${{ env.args.agent }}
+
+workspace:
+  path: ${{ env.projectDir }}
+  clone: true
+
+sandboxOptions:
+  cpus: 8
+  memory: 16g
+
+env:
+
+# on a host once:
+#
+# Codex:
+# sbx secret set openai --oauth
+#
+
+secrets:
+  github:
+    ref: op://GitHub/${{ env.args.owner }}-read/token
+
+
+lifecycle:
+  postCreate:
+    - name: Initialize sandbox environment
+      command: ~/.config/sandboxes/scripts/bootstrap.sh
+      timeout: 5m

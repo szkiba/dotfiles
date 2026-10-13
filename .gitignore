@@ -9,6 +9,10 @@
 *.pem
 !*.pub
 
+# Machine-local plaintext secrets sourced by .bashrc. Also matches the
+# chezmoi source names (dot_secrets.env, private_dot_secrets.env).
+*secrets.env
+
 # OS / editor noise
 .DS_Store
 *.swp

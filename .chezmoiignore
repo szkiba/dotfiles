@@ -1,4 +1,11 @@
 install.sh
+test-prompt.sh
+
+# Docker Sandboxes config, only where sbx is installed
+{{ if not (lookPath "sbx") -}}
+.sbxenv.yaml
+.config/sandboxes
+{{ end -}}
 
 # SSH private key material — never manage in dotfiles
 .ssh/id_*

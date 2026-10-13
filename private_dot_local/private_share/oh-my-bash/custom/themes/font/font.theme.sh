@@ -106,21 +106,20 @@ unset _omb_theme_ctx
 # The very first segment appended after the base host is joined by a
 # plain space, same as \W and the git status below it -- it's the boundary
 # between the base identity and the "extra facts" being tacked on. Every
-# join after that (multiple overlays stacking, or sandbox's own two
-# pieces) uses a yellow "·", since those are all part of the same "extra
-# facts" cluster rather than a new top-level prompt section.
+# join after that (multiple overlays stacking) uses a yellow "·", since
+# those are all part of the same "extra facts" cluster rather than a new
+# top-level prompt section.
 _omb_ctx_sep=' '
 _omb_ctx_join() {
     _OMB_CTX_HOST="${_OMB_CTX_HOST}${_omb_ctx_sep}${_omb_prompt_bold_yellow}$1"
     _omb_ctx_sep="${_omb_prompt_bold_yellow}·"
 }
 
-# sandbox.sh's bubblewrap sandbox sets $SANDBOX_HOST/$SANDBOX_NAME; nothing
-# else (namespaces alone) marks it, so these env vars are the only signal.
-if [[ -n "$SANDBOX_HOST" ]]; then
+# Docker Sandboxes (sbx) set IS_SANDBOX=1 inside the sandbox VM. The VM's
+# hostname is already the sandbox name, so \h shows the identity and only
+# the icon is added.
+if [[ "$IS_SANDBOX" == 1 ]]; then
     _OMB_CTX_ICON="${_OMB_CTX_ICON:+$_OMB_CTX_ICON }🔒"
-    _omb_ctx_join "$SANDBOX_HOST"
-    _omb_ctx_join "$SANDBOX_NAME"
 fi
 
 # Distrobox layers on top of a plain docker/podman container and can only

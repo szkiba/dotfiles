@@ -1,0 +1,55 @@
+# Install oh-my-bash on-demand.
+export OSH="$HOME/.oh-my-bash"
+
+if [ ! -d "$OSH" ] ; then
+  git clone -q https://github.com/ohmybash/oh-my-bash.git "$OSH" || {
+    echo "osh.sh: cloning oh-my-bash failed, skipping oh-my-bash setup" >&2
+    return 0
+  }
+fi
+
+# Keep custom themes/plugins/aliases/completions in chezmoi instead of
+# inside the git-cloned (and thus dotfiles-untracked) $OSH tree.
+export OSH_CUSTOM="${XDG_DATA_HOME:-$HOME/.local/share}/oh-my-bash/custom"
+
+# Set name of the theme to load. Optionally, if you set this to "random"
+# it'll load a random theme each time that oh-my-bash is loaded.
+OSH_THEME="font"
+THEME_SHOW_CLOCK="false"
+
+# To disable the uses of "sudo" by oh-my-bash, please set "false" to
+# this variable.  The default behavior for the empty value is "true".
+OMB_USE_SUDO=false
+
+# Which completions would you like to load? (completions can be found in ~/.oh-my-bash/completions/*)
+# Custom completions may be added to $OSH_CUSTOM/completions/
+# Example format: completions=(ssh git bundler gem pip pip3)
+# Add wisely, as too many completions slow down shell startup.
+completions=(
+  git
+  composer
+  ssh
+)
+
+# Which aliases would you like to load? (aliases can be found in ~/.oh-my-bash/aliases/*)
+# Custom aliases may be added to $OSH_CUSTOM/aliases/
+# Example format: aliases=(vagrant composer git-avh)
+# Add wisely, as too many aliases slow down shell startup.
+aliases=(
+  general
+  mine
+)
+
+# Which plugins would you like to load? (plugins can be found in ~/.oh-my-bash/plugins/*)
+# Custom plugins may be added to $OSH_CUSTOM/plugins/
+# Example format: plugins=(rails git textmate ruby lighthouse)
+# Add wisely, as too many plugins slow down shell startup.
+plugins=(
+  git
+  bashmarks
+  code-remote
+)
+
+# oh-my-bash's core lib unconditionally aliases cd to its own directory-
+# tracking wrapper (_omb_directories_cd); restore the plain builtin.
+[[ -s "$OSH/oh-my-bash.sh" ]] && source "$OSH/oh-my-bash.sh" && unalias cd
