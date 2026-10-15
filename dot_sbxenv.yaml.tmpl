@@ -36,10 +36,3 @@ env:
 secrets:
   github:
     ref: op://GitHub/${{ env.args.owner }}-read/token
-
-
-lifecycle:
-  postCreate:
-    - name: Initialize sandbox environment
-      command: ~/.config/sandboxes/scripts/bootstrap.sh
-      timeout: 5m
