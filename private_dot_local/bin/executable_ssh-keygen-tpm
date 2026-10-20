@@ -1,0 +1,15 @@
+#!/bin/sh
+# ssh-keygen wrapper for git's gpg.ssh.program: sign only with the TPM key
+# served by ssh-tpm-agent, and fail when the agent or the key is missing.
+
+set -eu
+
+sock="/run/user/$(id -u)/ssh-tpm-agent.sock"
+key="$HOME/.ssh/key-tpm-$(hostname -s).pub"
+
+if [ ! -S "$sock" ] || [ ! -f "$key" ]; then
+  echo "ssh-keygen-tpm: TPM agent socket or key not available ($sock, $key)" >&2
+  exit 1
+fi
+
+SSH_AUTH_SOCK=$sock exec ssh-keygen "$@"

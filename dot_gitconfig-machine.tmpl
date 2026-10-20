@@ -1,0 +1,49 @@
+{{/*
+Global git config for unattended tools (Obsidian git plugin, sync scripts),
+where git is only a backup or sync medium. Activate per process with:
+
+  GIT_CONFIG_GLOBAL=~/.gitconfig-machine
+
+It replaces ~/.gitconfig completely. Remotes go over SSH (the ssh-agent
+authenticates), and commits are signed with this host's TPM key, which is served by
+ssh-tpm-agent (gpg.ssh.program is the ssh-keygen-tpm wrapper, which points ssh-keygen at its socket). Signing
+fails when the agent or the key is missing. Nothing here prompts for a
+1Password approval or opens a pager.
+*/}}
+[user]
+	email = {{ .github_machine_user_email }}
+	name = {{ .github_machine_user_name }}
+
+[core]
+	quotepath = false
+	excludesfile = ~/.config/git/ignore
+	pager = cat
+
+[init]
+	defaultBranch = main
+
+[gpg]
+	format = ssh
+
+[gpg "ssh"]
+	program = {{ .chezmoi.homeDir }}/.local/bin/ssh-keygen-tpm
+	allowedSignersFile = ~/.config/git/allowed_signers_machine
+
+[user]
+	signingkey = {{ .chezmoi.homeDir }}/.ssh/key-tpm-{{ .chezmoi.hostname }}.pub
+
+[commit]
+	gpgsign = true
+
+[tag]
+	gpgsign = true
+
+[pull]
+	rebase = false
+
+# Always use SSH, the ssh-agent handles authentication
+[url "git@github.com:"]
+	insteadOf = https://github.com/
+
+[url "git@gist.github.com:"]
+	insteadOf = https://gist.github.com/

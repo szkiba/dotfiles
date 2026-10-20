@@ -11,8 +11,8 @@ priority, and avoids storing a stale user.signingkey in ~/.gitconfig.
 
 
 [user]
-	email = {{ .github_user }}@users.noreply.github.com
-	name = Iván SZKIBA
+	email = {{ .github_user_email }}
+	name = {{ .github_user_name }}
 
 [core]
 	quotepath = false
@@ -67,9 +67,15 @@ priority, and avoids storing a stale user.signingkey in ~/.gitconfig.
 [commit]
 	gpgsign = true
 
+[tag]
+	gpgsign = true
+
 [gpg "ssh"]
 	allowedSignersFile = ~/.config/git/allowed_signers
 	defaultKeyCommand = {{ .chezmoi.homeDir }}/.config/git/signing-key-command
+
+[pull]
+	rebase = false
 
 {{ if lookPath "delta" -}}
 [interactive]
