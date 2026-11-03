@@ -72,7 +72,7 @@ priority, and avoids storing a stale user.signingkey in ~/.gitconfig.
 
 [gpg "ssh"]
 	allowedSignersFile = ~/.config/git/allowed_signers
-	defaultKeyCommand = {{ .chezmoi.homeDir }}/.config/git/signing-key-command
+	defaultKeyCommand = {{ if stat "/home/agent/.config/git/signing-key-command" }}/home/agent{{ else }}{{ .chezmoi.homeDir }}{{ end }}/.config/git/signing-key-command
 
 [pull]
 	rebase = false

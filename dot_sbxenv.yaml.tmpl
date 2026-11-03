@@ -4,26 +4,49 @@ schemaVersion: "1"
 
 args:
   agent:
-    default: claude
+    default: "claude"
     enum:
       - claude
       - codex
+      - shell
+    description: "AI agent to use for the sandbox"
+  cpus:
+    default: "12"
+    pattern: "[1-9][0-9]*"
+    description: "Number of CPU cores for the sandbox"
+  memory:
+    default: "24g"
+    pattern: "[1-9][0-9]*[gG]"
+    description: "Amount of memory for the sandbox"
 
   owner:
-    default: grafana
+    default: "grafana"
     enum:
       - grafana
       - [[ .github_user ]]
+    description: "GitHub owner of the sandbox"
 
 agent: ${{ env.args.agent }}
 
 workspace:
   path: ${{ env.projectDir }}
-  clone: true
+  clone: false
+
+additionalWorkspaces:
+  - path: /home/agent/.ai
+    readOnly: true
+  - path: /home/agent/.claude/CLAUDE.md
+    readOnly: true
+  - path: /home/agent/.codex/AGENTS.md
+    readOnly: true
+  - path: /home/agent/.gitconfig
+    readOnly: true
+  - path: /home/agent/.config/git
+    readOnly: true
 
 sandboxOptions:
-  cpus: 8
-  memory: 16g
+  cpus: ${{ env.args.cpus }}
+  memory: ${{ env.args.memory }}
 
 env:
 
@@ -35,4 +58,4 @@ env:
 
 secrets:
   github:
-    ref: op://GitHub/${{ env.args.owner }}-read/token
+    ref: op://GitHub/cli/token

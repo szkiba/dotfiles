@@ -1,0 +1,13 @@
+#!/bin/bash
+set -euo pipefail
+
+: "${SBX_SANDBOX_NAME:?Missing sandbox name}"
+
+sandbox="$SBX_SANDBOX_NAME"
+github_user="{{ .github_user }}"
+
+echo "Applying dotfiles from $github_user in $sandbox..."
+
+# curl runs on the HOST; the installer and chezmoi run inside the VM.
+curl -fsLS get.chezmoi.io |
+    sbx exec -i "$sandbox" sh -c 'sh -s -- -b "$HOME/.local/bin" init --apply "$1"' sh "$github_user"
