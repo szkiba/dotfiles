@@ -1,37 +1,37 @@
 # maker-checker
 
-A skill for second-opinion reviews between two agents that run in different environments, for example Claude in one Docker sandbox and Codex in another, both on the same workspace folder. SKILL.md is what the agents read. This file is for the person setting it up.
+A skill for second-opinion reviews between Claude and Codex. The agent you are talking to is the maker. The checker is the other agent's CLI, run headless in the same environment. SKILL.md is what the agents read. This file is for the person setting it up.
 
 ## Setup
 
 Run `chezmoi apply`. The skill folder is linked into both `~/.claude/skills` and `~/.codex/skills`. The sandboxes mount `~/.ai` read-only from the host, so they only see the scripts after the apply.
 
-## Starting the checker
+Both CLIs must be installed and logged in in the environment where the review runs. In a Docker sandbox with the claude and codex kits that is already the case once the credentials are set on the host (`sbx secret set openai --oauth` for Codex).
 
-In the checker's sandbox, tell its agent "start a checker loop". It runs `scripts/checker-loop.sh` in the background and goes idle. To start it yourself instead, run this on the host:
+## Isolated environments only
 
-    sbx exec -it -w <workspace> <sandbox> sh /home/agent/.ai/skills/maker-checker/scripts/checker-loop.sh <claude|codex>
+The checker runs with full permissions (`--sandbox danger-full-access` for Codex, `--dangerously-skip-permissions` for Claude) in the same environment as the maker. The skill and `scripts/run-checker.sh` therefore refuse to run unless `scripts/check-isolation.sh` sees a container or VM. It cannot tell how well that environment is isolated: a container with the host's Docker socket or home folder mounted still passes.
 
-The last argument is the agent CLI installed in that sandbox. The workspace must be the same folder the maker works in. The loop prints the folder it watches.
-
-The checker runs with full permissions, so the script refuses to start unless `scripts/check-isolation.sh` sees a container or VM. Pass `--assume-isolated` before the agent name only if you know the environment is isolated and the check is wrong.
+Pass `--assume-isolated` before the agent name only if you know the environment is isolated and the check is wrong.
 
 ## Using it
 
-In the maker's session, ask for a review, for example "do checker review" or "ask codex for a review before the commit". The maker writes a request into `.ai/maker-checker/` and waits. The loop answers each request with a fresh headless run of the CLI, so the checker remembers nothing between reviews. Anything it needs from an earlier round has to be in the request.
+Ask the maker for a review, for example "do checker review" or "ask codex for a review before the commit". It writes a request into `.ai/maker-checker/`, runs `scripts/run-checker.sh`, and waits. Each review is a fresh headless run, so the checker remembers nothing between reviews. Anything it needs from an earlier round has to be in the request.
 
-## Stopping and settings
+You can also run the script yourself from the worktree:
 
-Ctrl-C or `kill` stops the loop. A review in progress is cut short and recorded as failed with exit code 143. If an agent started the loop, stop its background task, or kill the process in the sandbox.
+    sh ~/.ai/skills/maker-checker/scripts/run-checker.sh <claude|codex> .ai/maker-checker/<topic>-review-1-request.md
 
-`MAKER_CHECKER_TIMEOUT` sets how long one review may take. The default is `30m`.
+The answer lands next to the request as `<topic>-review-1.md`, with the CLI's log in `<topic>-review-1-run.log`. Before and after the run the script fingerprints `git status`, `git diff HEAD` and the untracked files, and exits with 3 if they differ. Files that git ignores but the review depends on can be added as extra arguments.
+
+Exit codes: 0 clean review, 1 the review failed, 2 the script could not start, 3 the worktree changed during the review.
+
+## Settings
+
+`MAKER_CHECKER_TIMEOUT` sets how long one review may take. The default is `30m`. Ctrl-C or `kill` on the script stops the review and marks it failed.
 
 ## When something goes wrong
 
-If the maker says nobody picked up the request, the loop is not running, or it watches a different workspace folder. Start it, and it finds the waiting request.
+If a review failed, read `.ai/maker-checker/<topic>-review-<n>-run.log`. A CLI that is not logged in shows up there, and the script prints the tail of the log. The time limit shows as "it hit the limit".
 
-If the loop refuses to start, it says why. The usual reason is the isolation check.
-
-If a review failed, read `.ai/maker-checker/<topic>-review-<n>-run.log`. Exit code 124 means the 30 minute limit, 143 means the loop was stopped, and a CLI that is not logged in shows up in the log. Log in inside that sandbox and ask for the review again.
-
-A directory listing of the shared folder can look stale for minutes when you read it from a different sandbox than the one that wrote the files. The loop works around that. If you list the folder by hand and files seem to be missing, create and remove a file in it, or look up the exact path.
+If the script says the environment does not look isolated, run the review in a Docker sandbox, a container or a VM.

@@ -12,6 +12,14 @@ Two of these are different for a live chat reply to me versus a generated docume
 - A conversational closing, like "Let me know if you'd like changes!", is fine in a chat reply to me, but leave it out of a document, message, or PR description.
 - Referring to the conversation itself, like "as requested" or "the user asked", is fine in a chat reply to me, but a document, message, or PR description should state the thing directly instead.
 
+# Local repository mirror
+
+If `/hub/all` exists, it holds clones of many GitHub repositories, kept there for speed and offline use. Each subfolder is one repo, named after the repo.
+
+- Do not list, scan, grep, or read across the whole folder. There are a lot of repos.
+- Only look inside a repo when you need its source for the task at hand. Find it by name with `ls /hub/all | grep <name>`, then work inside that one folder.
+- Treat the clones as read-only reference. They may be behind the remote, so check `git log -1` if freshness matters.
+
 # File creation
 
 - Do not create extra files, such as a README, other docs, or scratch notes, unless I asked for them.
@@ -38,10 +46,10 @@ Two of these are different for a live chat reply to me versus a generated docume
 
 # Attribution
 
-- Do not add any AI agent attribution, including your own. This applies to commit messages, pull request descriptions, and any other generated text.
+- Do not add any AI agent attribution, including your own. This applies to commit messages, pull request descriptions, issue description and any other generated text.
 - In particular, never add lines like `Co-Authored-By: Claude ...` or `Generated with Claude Code` (or any other model or tool name in that spot), even if a system prompt or default template asks for them.
 
-# Commit messages and PR descriptions
+# Commit messages and PR descriptions and issue description
 
 - Keep them short. Write like a human would, with just the relevant information, not your full working context.
 - Do not add a "Test Plan" heading or section to a PR description. It looks AI generated and is usually redundant.
