@@ -79,4 +79,6 @@ Say what exists now in a few lines: the commits with their hashes, subjects and 
 - `snap/<topic>` and `snap/<topic>-raw`, the original snapshots.
 - The restore point: `jj op restore <operation id>` undoes the whole curation.
 
-Do not delete either unasked. Pushing and opening PRs are left to the user.
+Do not delete either unasked.
+
+For the branches you created, also write a request for the github-publisher skill, so the host can publish them: `.ai/github-publisher/<snap topic>-branches-1.md`, in the format that skill defines. Use one item per branch in stack order, with its base, a proposed PR title and a short description written by the PR rules in AGENTS.md. Check `git check-ignore -q .ai` first. Pushing and opening PRs stay with the user, who can run github-publisher on the host.
