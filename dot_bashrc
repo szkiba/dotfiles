@@ -41,5 +41,14 @@ fi
 
 [ -r ~/.config/op/plugins.sh ] && . ~/.config/op/plugins.sh
 
+# Put ~/.local/wrappers first in PATH (after brew's shellenv, which also prepends),
+# so wrappers apply to child processes too, such as agents and scripts. The gh
+# wrapper there replaces the gh() function from plugins.sh, which would
+# otherwise run the plugin twice.
+_wrappers=$HOME/.local/wrappers
+_p=":$PATH:"; _p=${_p//":$_wrappers:"/:}; PATH="$_wrappers${_p%:}"
+unset -f gh
+unset _wrappers _p
+
 unset PAGER
 unalias c

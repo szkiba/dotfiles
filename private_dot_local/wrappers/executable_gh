@@ -1,0 +1,17 @@
+#!/usr/bin/env bash
+# Run gh through the 1Password shell plugin. The gh() function from
+# ~/.config/op/plugins.sh only exists in interactive shells, so agents and
+# scripts would otherwise call the real gh. Put this folder first in PATH.
+
+# Drop this folder from PATH, or `op plugin run -- gh` would find this
+# wrapper again instead of the real gh and loop.
+self=$(cd "${0%/*}" && pwd)
+p=":$PATH:"; p=${p//":$self:"/:}; p=${p#:}
+PATH=${p%:}
+
+# Without 1Password (for example inside a sandbox) just run the real gh.
+if ! command -v op >/dev/null 2>&1; then
+  exec gh "$@"
+fi
+
+exec op plugin run -- gh "$@"
