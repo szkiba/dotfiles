@@ -53,7 +53,7 @@ Write it as if it were the real commit message, because it will be reused. The s
 
 Trailers go in the last paragraph of the description, so pass them as a final `-m`, one per line. Never name a model or an agent in them. Add them only when they apply:
 
-- `Refs: <source> (<part>)` when the work comes from a spec, task file or issue. It names the task this milestone finishes, for example `Refs: openspec/changes/add-2fa (task 1.2)`. Leave it out when there is no such source.
+- `Refs: <source> (<part>)` when the work comes from a spec, task file or issue. It names the task or tasks this milestone finishes, for example `Refs: openspec/changes/add-2fa (task 1.2)` or `(tasks 2.1 to 2.3)`. Leave it out when there is no such source.
 - `Review: <topic> round 1` or `Review: <topic> rounds 1-2` when the milestone was reviewed. Use the maker-checker topic and the rounds that ran, or `Review: user` when the user reviewed it and said so. If you changed code after the last round, add `, fixes after round <n> not reviewed`. A milestone that was not reviewed gets no `Review:` line, so a missing line means unreviewed. Never claim a review that did not happen.
 
 ## At the end

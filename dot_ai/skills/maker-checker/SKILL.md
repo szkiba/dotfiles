@@ -38,7 +38,7 @@ Review files live in `.ai/maker-checker/` at the root of the current worktree. `
 - `-run.log`: the checker CLI's log.
 - `-response.md`: your verdict on each finding.
 
-Pick a topic that identifies the unit of work, so the same name comes back on a later round and rounds of different work never mix. For an OpenSpec change, use the change id plus the task, with the dot of the task number written as a hyphen: task 1.2 of the change `add-2fa` gives the topic `add-2fa-task-1-2`. If you lost track of the topic, look for the earlier files in `.ai/maker-checker/` before choosing a new one.
+Pick a topic that identifies the unit of work, so the same name comes back on a later round and rounds of different work never mix. For an OpenSpec change, use the change id plus the task, with the dot of the task number written as a hyphen: task 1.2 of the change `add-2fa` gives the topic `add-2fa-task-1-2`. When one review covers a group of tasks, use the group number: tasks 2.1 to 2.3 give `add-2fa-task-2`. If you lost track of the topic, look for the earlier files in `.ai/maker-checker/` before choosing a new one.
 
 Shell variables do not survive between commands, so start every command that touches these files with:
 
