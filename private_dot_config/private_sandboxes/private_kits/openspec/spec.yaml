@@ -1,0 +1,27 @@
+# syntax=docker/sandbox-kit:3
+schemaVersion: "3"
+kind: mixin
+displayName: OpenSpec
+description: Installs the OpenSpec CLI (npm package @fission-ai/openspec) at a pinned version.
+
+# CLI only. The openspec-* skills come from the shared sbx skills store
+# (sbx skills add Fission-AI/OpenSpec), not from this kit.
+args:
+  version:
+    default: "1.16.0"
+    pattern: "^[0-9]+\\.[0-9]+\\.[0-9]+$"
+    description: "OpenSpec CLI version to install"
+
+capabilities:
+  - type: com.docker.sandbox/lifecycle@1
+    config:
+      install:
+        - description: Install the OpenSpec CLI with npm
+          # Install hooks run with a stripped environment, so npm does not see the
+          # image's global prefix. ~/.local/bin is on the agent's PATH. A failed
+          # install fails the sandbox create on purpose.
+          user: "1000"
+          command: |
+            set -e
+            npm install -g --prefix "$HOME/.local" "@fission-ai/openspec@${{ kit.args.version }}"
+            "$HOME/.local/bin/openspec" --version

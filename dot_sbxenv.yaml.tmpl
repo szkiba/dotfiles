@@ -23,10 +23,14 @@ agent: sbx-kit-claude
 kits:
   - docker.io/docker/sbx-kit-claude:latest
   - docker.io/docker/sbx-kit-codex-mixin:latest
+  - [[ .chezmoi.homeDir ]]/.config/sandboxes/kits/global-agents
+  - [[ .chezmoi.homeDir ]]/.config/sandboxes/kits/openspec
+  - [[ .chezmoi.homeDir ]]/.config/sandboxes/kits/jj
+  - [[ .chezmoi.homeDir ]]/.config/sandboxes/kits/ssh-agent
 
 workspace:
   path: ${{ env.projectDir }}
-  clone: false
+  clone: true
 
 additionalWorkspaces:
   - path: /home/agent/.ai
@@ -41,6 +45,8 @@ additionalWorkspaces:
   - path: /home/agent/.config/git
     readOnly: true
   - path: /hub/all
+    readOnly: true
+  - path: /home/agent/.config/jj/config.toml
     readOnly: true
 
 sandboxOptions:
@@ -63,3 +69,9 @@ env:
 #secrets:
 #  github:
 #    ref: op://GitHub/cli/token
+
+# skills
+# sbx skills add Fission-AI/OpenSpec
+# sbx skills add blader/humanizer
+# sbx skills add JuliusBrussee/caveman
+

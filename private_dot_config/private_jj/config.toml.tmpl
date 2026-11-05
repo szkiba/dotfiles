@@ -1,0 +1,12 @@
+#:schema https://docs.jj-vcs.dev/latest/config-schema.json
+
+[user]
+name = {{ .github_user_name | quote }}
+email = {{ .github_user_email | quote }}
+
+# Same trust file as git (gpg.ssh.allowedSignersFile). jj has no key command
+# like git's gpg.ssh.defaultKeyCommand, so the key is passed to `jj sign --key`.
+# behavior stays at its default ("keep"), so jj does not sign its own commits.
+[signing]
+backend = "ssh"
+backends.ssh.allowed-signers = "~/.config/git/allowed_signers"

@@ -1,0 +1,24 @@
+# syntax=docker/sandbox-kit:3
+schemaVersion: "3"
+kind: mixin
+displayName: SSH agent
+description: Forwards the host SSH agent into the sandbox, limited to signing git commits.
+
+# Agent forwarding is on by default in the daemon (ssh.agentForwardingEnabled),
+# but a v3 kit has to ask for the socket, or nothing is forwarded. The host
+# client needs SSH_AUTH_SOCK set when it creates or starts the sandbox. Private
+# keys stay on the host: the sandbox can list keys and ask for signatures only.
+#
+# unrestricted: false with sign: [git] limits the agent to git-namespace
+# signatures, which is what git and jj use for commit signing. It cannot log in
+# to servers. Add authenticate: [github.com] only if the sandbox must push over
+# SSH itself.
+capabilities:
+  - type: com.docker.sandbox/ssh-agent@1
+    # Skip the grant instead of failing sandbox create when the host has no agent.
+    optional: true
+    description: Sign git commits with the host SSH key
+    config:
+      phase: runtime
+      unrestricted: false
+      sign: [git]

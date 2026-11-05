@@ -1,0 +1,33 @@
+# syntax=docker/sandbox-kit:3
+schemaVersion: "3"
+kind: mixin
+displayName: Global agents
+description: Copies the host ~/.ai/AGENTS.md into the agent instruction files at every start.
+
+# A mixin's agent-context text only becomes a pointer file that the agent reads
+# on demand, so the global rules would not be always on. This copies the mounted
+# ~/.ai/AGENTS.md into CLAUDE.md and AGENTS.md instead. It needs ~/.ai mounted
+# in the sandbox (additionalWorkspaces in ~/.sbxenv.yaml).
+capabilities:
+  - type: com.docker.sandbox/lifecycle@1
+    config:
+      startup:
+        - description: Add ~/.ai/AGENTS.md to the agent instruction files
+          command: |
+            src="$HOME/.ai/AGENTS.md"
+            if [ ! -r "$src" ]; then
+              echo "global-agents: $src not found, is ~/.ai mounted?" >&2
+              exit 0
+            fi
+            for f in "$HOME/.claude/CLAUDE.md" "$HOME/.codex/AGENTS.md"; do
+              [ -d "$(dirname "$f")" ] || continue
+              tmp=$(mktemp) || continue
+              # Replace the block from an earlier start, then append a fresh one.
+              { [ ! -e "$f" ] || sed '/^<!-- global-agents:start -->$/,/^<!-- global-agents:end -->$/d' "$f"
+                echo '<!-- global-agents:start -->'
+                cat "$src"
+                echo '<!-- global-agents:end -->'
+              } >"$tmp" && cat "$tmp" >"$f" || echo "global-agents: cannot update $f" >&2
+              rm -f "$tmp"
+            done
+            exit 0

@@ -1,0 +1,49 @@
+# syntax=docker/sandbox-kit:3
+schemaVersion: "3"
+kind: mixin
+displayName: Jujutsu
+description: Installs the jj (Jujutsu) version control CLI from the GitHub release, at a pinned version.
+
+args:
+  version:
+    default: "0.46.0"
+    pattern: "^[0-9]+\\.[0-9]+\\.[0-9]+$"
+    description: "jj version to install"
+
+capabilities:
+  - type: com.docker.sandbox/lifecycle@1
+    config:
+      install:
+        - description: Install jj from the GitHub release
+          # ~/.local/bin is on the agent's PATH. A failed install fails the
+          # sandbox create on purpose.
+          user: "1000"
+          command: |
+            set -e
+            case "$(uname -m)" in
+              x86_64) arch=x86_64 ;;
+              aarch64 | arm64) arch=aarch64 ;;
+              *) echo "jj: unsupported architecture $(uname -m)" >&2; exit 1 ;;
+            esac
+            v="${{ kit.args.version }}"
+            mkdir -p "$HOME/.local/bin"
+            curl -fsSL "https://github.com/jj-vcs/jj/releases/download/v${v}/jj-v${v}-${arch}-unknown-linux-musl.tar.gz" |
+              tar -xzf - -C "$HOME/.local/bin" ./jj
+            "$HOME/.local/bin/jj" --version
+      startup:
+        - description: Initialize jj in colocated mode when the workspace is a git repo without .jj
+          command: |
+            dir="${WORKSPACE_DIR:-$PWD}"
+            if [ ! -d "$dir" ]; then
+              echo "jj: workspace $dir not found, skipping init" >&2
+              exit 0
+            fi
+            cd "$dir" || exit 0
+            if [ -e .git ] && [ ! -e .jj ]; then
+              if command -v jj >/dev/null 2>&1; then
+                jj git init --colocate || echo "jj: colocated init failed in $dir" >&2
+              else
+                echo "jj: not on PATH, skipping init" >&2
+              fi
+            fi
+            exit 0

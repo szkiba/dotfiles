@@ -69,7 +69,7 @@ and write `"$run-request.md"`, `"$run.md"` and so on.
 
 5. Report to the user in a few lines: each finding with your verdict, what you changed, and what you left alone. After the second round, say whether significant findings remain and ask whether to run another.
 
-6. Commits and pushes follow the user's global agent instructions: show the exact commit message and wait for approval, and ask before every push.
+6. When no further round is planned and the milestone-snapshots skill applies (big work, jj set up), take the milestone snapshot now, not before or between rounds. A jj snapshot needs no approval, see the jj section of AGENTS.md. Git commits and pushes follow the user's global agent instructions: show the exact commit message and wait for approval, and ask before every push.
 
 ## Notes
 

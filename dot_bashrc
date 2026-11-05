@@ -23,6 +23,11 @@ if direnv --version >/dev/null 2>&1 ; then
   eval "$(direnv hook bash)"
 fi
 
+# Shell completions for jj (Jujutsu), if installed.
+if command -v jj >/dev/null 2>&1 ; then
+  source <(COMPLETE=bash jj)
+fi
+
 # Machine-local secrets, not tracked in dotfiles.
 [ -r ~/.secrets.env ] && . ~/.secrets.env
 

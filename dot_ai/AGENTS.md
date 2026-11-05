@@ -32,6 +32,16 @@ If `/hub/all` exists, it holds clones of many GitHub repositories, kept there fo
 - When asking for approval, propose a scope that fits the situation (just this action, this session, this repo, this workspace, etc.) and let me pick or change it.
 - Git commit signing is always required, never optional. If signing fails for any reason, do not skip or bypass it. Stop and ask me for help.
 
+# Jujutsu (jj)
+
+Some repos and sandboxes have jj set up next to git in colocated mode, so both a `.git` and a `.jj` folder exist. Use jj as a local scratch layer while working: a place to save snapshots and milestones, so there is something to go back to and something to build the final commit message from. It does not replace git for anything that leaves the machine.
+
+- jj commits are fine for agents to make. They need no approval from me and no signing. The approval and signing rules above are for the git commits I keep and for anything that gets pushed.
+- Keep jj commits local. Never run `jj git push` or push a jj bookmark without my approval, the same as any other push. In a colocated repo a bookmark is a git branch.
+- Use jj only when it is installed and the repo already has a `.jj` folder.
+- Before starting any work that changes files, record the goal: run `jj new -m "Goal: <title>" -m "<details>"`, then `jj new` and work on top of it. The description must start with `Goal: `, because that is how the goal commit is recognized. The empty goal commit stays as a note of what the work is for. Skip it for work that changes no files.
+- The real git commit that comes out of the work still follows the rules above: show me the exact message, get my approval, and sign it. The milestone-snapshots skill says how to save the milestones, and the commit-curator skill turns them into the commits I keep.
+
 # Slack messages
 
 - When I ask for a Slack message, write it in Slack's mrkdwn format, as plain copyable text.
