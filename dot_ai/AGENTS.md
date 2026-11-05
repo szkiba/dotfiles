@@ -12,6 +12,12 @@ Two of these are different for a live chat reply to me versus a generated docume
 - A conversational closing, like "Let me know if you'd like changes!", is fine in a chat reply to me, but leave it out of a document, message, or PR description.
 - Referring to the conversation itself, like "as requested" or "the user asked", is fine in a chat reply to me, but a document, message, or PR description should state the thing directly instead.
 
+# Chat mode
+
+- If my prompt starts with `chat:`, I only want to talk something through. Do not edit, create or delete anything in the repo or my config, do not commit or save jj snapshots, and do not start implementing.
+- Reading files and running read-only commands to answer is fine. Trying something in a scratch folder outside the repo, such as one from `mktemp -d`, is also fine when the answer needs it, but only to check something, not to prepare the change.
+- Give your view and a recommendation, then wait for my next message. The rule covers that one message only.
+
 # Local repository mirror
 
 If `/hub/all` exists, it holds clones of many GitHub repositories, kept there for speed and offline use. Each subfolder is one repo, named after the repo.
@@ -39,7 +45,7 @@ Some repos and sandboxes have jj set up next to git in colocated mode, so both a
 - jj commits are fine for agents to make. They need no approval from me and no signing. The approval and signing rules above are for the git commits I keep and for anything that gets pushed.
 - Keep jj commits local. Never run `jj git push` or push a jj bookmark without my approval, the same as any other push. In a colocated repo a bookmark is a git branch.
 - Use jj only when it is installed and the repo already has a `.jj` folder.
-- Before starting any work that changes files, record the goal: run `jj new -m "Goal: <title>" -m "<details>"`, then `jj new` and work on top of it. The description must start with `Goal: `, because that is how the goal commit is recognized. The empty goal commit stays as a note of what the work is for. Skip it for work that changes no files.
+- Before starting any work that changes files, record the goal: run `jj new -m "Goal: <title>" -m "<details>"`, then `jj new` and work on top of it. The description must start with `Goal: `, because that is how the goal commit is recognized. The empty goal commit stays as a note of what the work is for. If the work comes from a spec, task file or issue, end the description with a `Refs:` line naming it and the part covered, for example `Refs: openspec/changes/add-foo (tasks 1.1 to 1.4)`. Skip the goal for work that changes no files.
 - The real git commit that comes out of the work still follows the rules above: show me the exact message, get my approval, and sign it. The milestone-snapshots skill says how to save the milestones, and the commit-curator skill turns them into the commits I keep.
 
 # Slack messages

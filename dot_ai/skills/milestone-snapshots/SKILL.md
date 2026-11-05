@@ -39,17 +39,22 @@ If there is a goal commit, the starting point is the commit below it, so use `-r
 
     jj log -r '@- & empty() & description(regex:"\\AGoal: ")' --no-graph -T 'commit_id.short(8)'
 
-While nothing is above it yet, write the planned milestones into its description, keeping the first line: `jj describe -r @- -m "Goal: <title>" -m "<details and planned milestones>"`.
+While nothing is above it yet, write the planned milestones into its description, keeping the first line and any `Refs:` line at the end: `jj describe -r @- -m "Goal: <title>" -m "<details and planned milestones>" -m "Refs: <source>"`. Leave out the last `-m` when there is no `Refs:` line.
 
 At the end of each milestone:
 
 1. Run `jj st`. If there are no changes, skip the snapshot, because `jj commit` would create an empty commit.
 2. Check the listed files. jj saves every file that is not ignored, so credentials, build output and other files that do not belong must be ignored or removed first.
-3. Run `jj commit -m "<subject>" -m "<body>"`. This saves the working copy and starts a new empty one on top.
+3. Run `jj commit -m "<subject>" -m "<body>"`, with a final `-m` for the trailers when they apply, see below. This saves the working copy and starts a new empty one on top.
 
 ## The message
 
 Write it as if it were the real commit message, because it will be reused. The subject is short and in the imperative. The body is a sentence or two on why the milestone was done, not a list of files. Follow the commit message rules in AGENTS.md, including no AI attribution.
+
+Trailers go in the last paragraph of the description, so pass them as a final `-m`, one per line. Never name a model or an agent in them. Add them only when they apply:
+
+- `Refs: <source> (<part>)` when the work comes from a spec, task file or issue. It names the task this milestone finishes, for example `Refs: openspec/changes/add-2fa (task 1.2)`. Leave it out when there is no such source.
+- `Review: <topic> round 1` or `Review: <topic> rounds 1-2` when the milestone was reviewed. Use the maker-checker topic and the rounds that ran, or `Review: user` when the user reviewed it and said so. If you changed code after the last round, add `, fixes after round <n> not reviewed`. A milestone that was not reviewed gets no `Review:` line, so a missing line means unreviewed. Never claim a review that did not happen.
 
 ## At the end
 
