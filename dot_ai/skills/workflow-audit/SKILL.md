@@ -3,8 +3,8 @@ name: workflow-audit
 description: >
   Check that the agent workflow was followed: the rules in AGENTS.md and the
   skills (milestone-snapshots, maker-checker, commit-curator, github-responder,
-  github-publisher). Reads the git and jj state of a repo and the Claude Code
-  and Codex session transcripts, on the host or from a sandbox, and reports
+  github-publisher). Reads the git and jj state of a repo and the Claude Code,
+  Codex and Copilot CLI session transcripts, on the host or from a sandbox, and reports
   where a rule was broken or a skill was skipped. Use only when the user asks
   to audit, inspect or monitor the workflow or what the agents did. Read-only:
   it reports and never fixes, commits, pushes or posts. Not for ordinary work.
@@ -35,7 +35,7 @@ Repo state, run where the work was done, because `.ai/maker-checker/` and the jj
     sh ~/.ai/skills/workflow-audit/scripts/audit.sh repo <path>
     sbx exec -i <sandbox> bash -lc 'cd <path> && sh -s -- repo .' < ~/.ai/skills/workflow-audit/scripts/audit.sh
 
-Transcripts. On the host, point `--cwd` at the repo. For a sandbox, copy its session folders out first and pass the copy, with `--cwd` set to the repo path inside the sandbox. Claude keeps a folder per working directory under `~/.claude/projects`, named after the path with `/` replaced by `-`. Codex sessions are under `~/.codex/sessions`, and that folder may not exist:
+Transcripts. On the host, point `--cwd` at the repo. For a sandbox, copy its session folders out first and pass the copy, with `--cwd` set to the repo path inside the sandbox. Claude keeps a folder per working directory under `~/.claude/projects`, named after the path with `/` replaced by `-`. Codex sessions are under `~/.codex/sessions` and Copilot CLI sessions under `~/.copilot/session-state/<id>/events.jsonl`, host only. Any of these folders may not exist:
 
     sh ~/.ai/skills/workflow-audit/scripts/audit.sh transcripts --cwd <repo path> [--since YYYY-MM-DD] [--include-active]
     stage=$(mktemp -d); sbx cp <sandbox>:/home/agent/.claude/projects/<folder> "$stage/"
@@ -61,7 +61,7 @@ Decide for each one: confirmed, explained (the user approved it in the prompt ju
 - `skill-skipped`: the prompt asked for a skill and the session shows no sign of it. Check that the user was not only talking about the skill.
 - `chat-mode`: a `chat:` prompt allows reading only. A file edit outside `/tmp` is a FAIL. A command that may change things is a WARN.
 - `signing-bypass`: signing turned off. Fine in a throwaway clone, a problem in the real repo.
-- `commit-approval`, `outbound-write`: a `git commit`, a push or a GitHub write. Judge by the prompt right before it: was the exact text shown and approved? It is only INFO when the session used github-publisher.
+- `commit-approval`, `outbound-write`: a `git commit`, a push or a GitHub write. Judge by the prompt right before it: was the exact text shown and approved? In a Copilot session an approval given through its ask_user tool shows up as `approval: <choice>`. It is only INFO when the session used github-publisher.
 
 ## Report
 
@@ -69,7 +69,7 @@ Keep it short and plain. Start with what was covered, from the `checked:` line, 
 
 ## What it cannot see
 
-The script cannot read intent, so approval is always your call. In chat mode it does not see shell redirects, `rm` or `cp`. It does not read text inside files that were written with Edit or Write. Commands that build a throwaway repo (`git init`, `git clone`, `mktemp`, `GIT_CONFIG_GLOBAL`) are not checked for commits and signing. The Codex parser is best effort and was tried on a few small sessions only. If the user wants a deep audit of one skill, read that session against the steps in its SKILL.md yourself. The script covers only the cheap checks.
+The script cannot read intent, so approval is always your call. In chat mode it does not see shell redirects, `rm` or `cp`. It does not read text inside files that were written with Edit or Write. Commands that build a throwaway repo (`git init`, `git clone`, `mktemp`, `GIT_CONFIG_GLOBAL`) are not checked for commits and signing. The Codex and Copilot parsers are best effort. Codex was tried on a few small sessions. Copilot was tried on two github-publisher sessions that used only the bash, skill and ask_user tools, so its file edit tool names are a guess. If the user wants a deep audit of one skill, read that session against the steps in its SKILL.md yourself. The script covers only the cheap checks.
 
 ## Adding a check
 

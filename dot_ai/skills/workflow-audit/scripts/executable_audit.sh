@@ -9,8 +9,9 @@
 # Run it where the work was done, for a sandbox with `sbx exec`. It never
 # changes anything: jj runs with --ignore-working-copy and git without locks.
 #
-# transcripts: reads Claude Code and Codex session files (*.jsonl). Without
-# arguments it reads ~/.claude/projects and ~/.codex/sessions. Only sessions
+# transcripts: reads Claude Code, Codex and Copilot CLI session files (*.jsonl).
+# Without arguments it reads ~/.claude/projects, ~/.codex/sessions and
+# ~/.copilot/session-state. Only sessions
 # whose working directory starts with --cwd (default: the current directory)
 # and that were written since --since (default: 7 days ago) are read. Sessions
 # written in the last 2 minutes are skipped, so the session that runs the audit
@@ -277,6 +278,33 @@ def cxsay: select(.type == "response_item" and .payload.type == "message" and .p
   | ([.payload.content[]? | select(.type == "output_text") | .text] | join("\n")) as $t | select($t != "")
   | {ts: $ts, kind: "say", name: "", text: $t};
 
+# ---- Copilot CLI lines (best effort). Only the bash, skill and ask_user tools
+# have been seen, so the file edit tool names below are a guess. An ask_user
+# answer is an approval of the user, kept as kind "answer".
+def pevents:
+  .timestamp as $ts
+  | if .type == "user.message" then
+      (.data.content // "" | gsub("^\\s+|\\s+$"; "")) as $t | select($t != "")
+      | {ts: $ts, kind: "prompt", name: "", text: $t}
+    elif .type == "tool.execution_start" then
+      (.data.toolName // "") as $n
+      | (.data.arguments | if type == "object" then . else {} end) as $a
+      | if $n == "bash" then {ts: $ts, kind: "tool", name: "Bash", text: ($a.command // "")}
+        elif $n == "skill" then {ts: $ts, kind: "tool", name: "Skill", text: ($a.skill // "")}
+        elif $n == "ask_user" then empty
+        elif ($n | IN("edit", "create", "write", "str_replace", "str_replace_editor", "apply_patch", "insert")) then
+          {ts: $ts, kind: "tool", name: "Edit", text: ($a.path // $a.file_path // $a.filePath // "")}
+        else {ts: $ts, kind: "tool", name: $n, text: ($a | tojson | .[0:20000])} end
+    elif .type == "human_response.recorded" then
+      (.data.response // {}) as $r
+      | ($r.content | if type == "object" then ([.[]? | tostring] | join(", ")) elif type == "string" then . else "" end) as $c
+      | select($c != "")
+      | {ts: $ts, kind: "answer", name: "", text: ($c + " (asked: " + (($r.message // "") | snip(120)) + ")")}
+    else empty end;
+def psay: select(.type == "assistant.message") | .timestamp as $ts
+  | (.data.content // "") as $t | select($t != "")
+  | {ts: $ts, kind: "say", name: "", text: $t};
+
 # ---- the hand-kept list of checks
 def triggers: [
   {skill: "milestone-snapshots", ask: "(?i)\\bmilestoned\\b|use milestones", used: "milestone-snapshots|bookmark create snap/"},
@@ -313,17 +341,18 @@ JQ_PROG=$(
 	cat <<'EOF'
 [inputs | fromjson?] as $L
 | ($L | map(select(.type == "session_meta")) | first // null) as $sm
-| ($sm != null) as $codex
-| (if $codex then ($sm.payload.cwd // "") else ([$L[] | .cwd | select(. != null)] | first // "") end) as $cwd
-| (if $codex then ($sm.payload.id // "") else ([$L[] | .sessionId | select(. != null)] | first // "") end) as $sid
+| ($L | map(select(.type == "session.start")) | first // null) as $cs
+| (if $sm != null then "codex" elif $cs != null then "copilot" else "claude" end) as $agent
+| (if $agent == "codex" then ($sm.payload.cwd // "") elif $agent == "copilot" then ($cs.data.context.cwd // "") else ([$L[] | .cwd | select(. != null)] | first // "") end) as $cwd
+| (if $agent == "codex" then ($sm.payload.id // "") elif $agent == "copilot" then ($cs.data.sessionId // "") else ([$L[] | .sessionId | select(. != null)] | first // "") end) as $sid
 | select($cwd | startswith($prefix))
-| [ $L[] | if $codex then cxevents else cevents end ] as $ev
+| [ $L[] | if $agent == "codex" then cxevents elif $agent == "copilot" then pevents else cevents end ] as $ev
 | ($ev | to_entries) as $E
 | ($sid[0:8]) as $s
 | ($ev | any(.[]; .kind == "tool" and (.text | test("github-publisher")))) as $usedpub
 | def where($e): "\($s) \($e.ts[0:16])";
-  def prevprompt($i): ([$E[] | select(.key < $i and .value.kind == "prompt") | .value.text] | last // "") | snip(50);
-  (["#meta", (if $codex then "codex" else "claude" end), $s, $cwd,
+  def prevprompt($i): ([$E[] | select(.key < $i and (.value.kind | IN("prompt", "answer"))) | (if .value.kind == "answer" then "approval: " else "" end) + .value.text] | last // "") | snip(50);
+  (["#meta", $agent, $s, $cwd,
     ($ev | map(select(.kind == "prompt")) | length | tostring),
     ($ev | map(select(.kind == "tool")) | length | tostring)] | @tsv),
 
@@ -370,10 +399,10 @@ EOF
 JQ_CONTEXT=$(
 	cat <<'EOF'
 [inputs | fromjson?] as $L
-| (($L | map(select(.type == "session_meta")) | length) > 0) as $codex
-| [ $L[] | (if $codex then (cxevents, cxsay) else (cevents, csay) end)
+| (if ($L | any(.[]; .type == "session_meta")) then "codex" elif ($L | any(.[]; .type == "session.start")) then "copilot" else "claude" end) as $agent
+| [ $L[] | (if $agent == "codex" then (cxevents, cxsay) elif $agent == "copilot" then (pevents, psay) else (cevents, csay) end)
     | select(.ts >= $from and .ts[0:($to | length)] <= $to)
-    | [.ts[11:19], (if .kind == "prompt" then "user" elif .kind == "say" then "agent" else .name end), (.text | snip(300))]
+    | [.ts[11:19], (if .kind == "prompt" then "user" elif .kind == "say" then "agent" elif .kind == "answer" then "approval" else .name end), (.text | snip(300))]
     | select(.[2] != "") | @tsv ] as $rows
 | $rows[0:60][],
   (if ($rows | length) > 60 then "... \($rows | length - 60) more events in this window, narrow it" else empty end)
@@ -383,7 +412,7 @@ EOF
 # Without --root arguments, read the default transcript folders.
 default_roots() {
 	if [ ! -s "$tmp/roots" ]; then
-		for d in "$HOME/.claude/projects" "$HOME/.codex/sessions"; do
+		for d in "$HOME/.claude/projects" "$HOME/.codex/sessions" "$HOME/.copilot/session-state"; do
 			[ -d "$d" ] && echo "$d" >>"$tmp/roots"
 		done
 	fi
@@ -411,7 +440,7 @@ cmd_context() {
 	: >"$tmp/found"
 	while IFS= read -r r; do
 		[ -e "$r" ] || die "$r does not exist"
-		find "$r" -type f -name "*$sid*.jsonl" >>"$tmp/found"
+		find "$r" -type f \( -name "*$sid*.jsonl" -o -path "*/$sid*/events.jsonl" \) >>"$tmp/found"
 	done <"$tmp/roots"
 	if [ ! -s "$tmp/found" ]; then
 		echo "INFO no-session: no transcript with $sid in its name under the given folders"
@@ -456,7 +485,7 @@ cmd_transcripts() {
 		fi
 	done <"$tmp/all"
 
-	nclaude=0 ncodex=0 nprompts=0 ntools=0 nread=0
+	nclaude=0 ncodex=0 ncopilot=0 nprompts=0 ntools=0 nread=0
 	: >"$tmp/meta"
 	while IFS= read -r f; do
 		if ! jq -Rn -r --arg since "$since" --arg prefix "$prefix" "$JQ_DEFS
@@ -473,12 +502,13 @@ $JQ_PROG" "$f" >"$tmp/one" 2>"$tmp/jq.err"; then
 	if [ -s "$tmp/meta" ]; then
 		nclaude=$(awk -F'\t' '$2 == "claude"' "$tmp/meta" | wc -l)
 		ncodex=$(awk -F'\t' '$2 == "codex"' "$tmp/meta" | wc -l)
+		ncopilot=$(awk -F'\t' '$2 == "copilot"' "$tmp/meta" | wc -l)
 		nprompts=$(awk -F'\t' '{ n += $5 } END { print n + 0 }' "$tmp/meta")
 		ntools=$(awk -F'\t' '{ n += $6 } END { print n + 0 }' "$tmp/meta")
 	fi
 	[ "$nread" -gt 0 ] || finding INFO no-sessions "no session matched, check --cwd ($prefix) and --since ($since)"
 	[ "$skipped" -eq 0 ] || finding INFO active-skipped "$skipped session file(s) written in the last 2 minutes were skipped, use --include-active to read them"
-	report "$nread sessions ($nclaude claude, $ncodex codex) with working directory under $prefix, written since $since; $nprompts prompts, $ntools tool calls"
+	report "$nread sessions ($nclaude claude, $ncodex codex, $ncopilot copilot) with working directory under $prefix, written since $since; $nprompts prompts, $ntools tool calls"
 }
 
 # --------------------------------------------------------------------- main
