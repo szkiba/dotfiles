@@ -6,8 +6,10 @@
 #
 # Run it on the host, from the repo the sandbox works on, or give --repo. From
 # the sandbox it copies the Claude Code and Codex session transcripts (only the
-# *.jsonl files), the .ai/maker-checker review files (only *.md), and the output
-# of `audit.sh repo` run inside the sandbox. They go to
+# *.jsonl files), the .ai/maker-checker review files (only *.md), the notes in
+# the Claude memory folder of the repo (only *.md of at most 64 KB, for the
+# knowledge-import skill), and the output of `audit.sh repo` run inside the
+# sandbox. They go to
 #
 #   $AGENT_ARCHIVE_DIR/<repo path with / as ->/<sandbox>-<first 8 of its id>/
 #
@@ -127,6 +129,7 @@ fetch() {
 fetch /home/agent/.claude/projects claude
 fetch /home/agent/.codex/sessions codex
 fetch "$root/.ai/maker-checker" maker-checker
+fetch "/home/agent/.claude/projects/$rkey/memory" memory
 
 # Keep only plain files of the kinds that are needed. A symlink in the copy could
 # point at something on this host that a later read would follow.
@@ -135,6 +138,7 @@ for d in claude codex; do
 	[ ! -d "$stage/$d" ] || find "$stage/$d" -type f ! -name '*.jsonl' -delete
 done
 [ ! -d "$stage/maker-checker" ] || find "$stage/maker-checker" -type f ! -name '*.md' -delete
+[ ! -d "$stage/memory" ] || find "$stage/memory" -type f \( ! -name '*.md' -o -size +64k \) -delete
 find "$stage" -mindepth 1 -type d -empty -delete 2>/dev/null
 
 mb=$(du -sm "$stage" | cut -f1)
@@ -164,6 +168,7 @@ echo "archive: $name ($id) -> $dest"
 echo "  claude sessions: $(count claude)"
 echo "  codex sessions: $(count codex)"
 echo "  maker-checker: $(count maker-checker)"
+echo "  memory notes: $(count memory)"
 echo "  repo audit: $audit"
 echo "  size: $(du -sh "$dest" | cut -f1)"
 prune
