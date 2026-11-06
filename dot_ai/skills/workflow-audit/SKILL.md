@@ -37,15 +37,20 @@ Repo state, run where the work was done, because `.ai/maker-checker/` and the jj
 
 Transcripts. On the host, point `--cwd` at the repo. For a sandbox, copy its session folders out first and pass the copy, with `--cwd` set to the repo path inside the sandbox. Claude keeps a folder per working directory under `~/.claude/projects`, named after the path with `/` replaced by `-`. Codex sessions are under `~/.codex/sessions`, and that folder may not exist:
 
-    sh ~/.ai/skills/workflow-audit/scripts/audit.sh transcripts --cwd <repo path> [--since YYYY-MM-DD]
+    sh ~/.ai/skills/workflow-audit/scripts/audit.sh transcripts --cwd <repo path> [--since YYYY-MM-DD] [--include-active]
     stage=$(mktemp -d); sbx cp <sandbox>:/home/agent/.claude/projects/<folder> "$stage/"
-    sh ~/.ai/skills/workflow-audit/scripts/audit.sh transcripts --cwd <path in sandbox> "$stage"
+    sh ~/.ai/skills/workflow-audit/scripts/audit.sh transcripts --cwd <path in sandbox> [--since YYYY-MM-DD] [--include-active] "$stage"
+
+Sessions written in the last two minutes are skipped, so an audit of work that is still going on would miss its live session. Add `--include-active` for that, and a `--since` of today so older sessions do not bury it. A live session is still being written, so a finding in it can change a minute later. The copy in `$stage` holds raw transcripts, so delete it when you are done.
 
 ## Judge the findings
 
-A finding is a lead, not a verdict. The script cannot tell intent, so read the spot before you report it. The line names the session by its first 8 characters and a time. Find the file with `find <folder> -name '<sid8>*.jsonl'` and read the prompts and commands around that time:
+A finding is a lead, not a verdict. The script cannot tell intent, so read the spot before you report it. The line names the session by its first 8 characters and a minute. The `context` command prints the prompts, the agent's text and the tool calls around that time, shortened and with token-like strings masked, at most 60 events. Pass the folder you gave the transcripts mode, and leave out the end time for a single minute:
 
-    jq -R -r 'fromjson? | select(.timestamp >= "<from>" and .timestamp <= "<to>") | select(.type == "user" or .type == "assistant") | [.timestamp[11:16], .type, ([.message.content | if type == "string" then . else (.[] | select(.type == "text" or .type == "tool_use") | (.text // .input.command // "")) end] | join(" ") | gsub("\\s+"; " ") | .[0:300])] | @tsv' "$f" | awk -F'\t' '$3 != ""'
+    sh ~/.ai/skills/workflow-audit/scripts/audit.sh context [--root <folder>] <sid8> <from> [<to>]
+    sh ~/.ai/skills/workflow-audit/scripts/audit.sh context --root "$stage" 6fc621ba 2026-11-05T15:15 2026-11-05T15:17
+
+Its output is transcript data like the rest. Prefer it to reading a raw transcript with your own `jq` or `cat`, which shows unmasked text.
 
 Decide for each one: confirmed, explained (the user approved it in the prompt just before, or it ran in a throwaway clone), or cannot tell. What the checks mean:
 

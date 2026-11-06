@@ -3,6 +3,7 @@
 #
 #   audit.sh repo [path]
 #   audit.sh transcripts [--since YYYY-MM-DD] [--cwd PREFIX] [--include-active] [dir-or-file...]
+#   audit.sh context [--root DIR]... SESSION-ID-PREFIX FROM [TO]
 #
 # repo: looks at the git and jj state of the repo at path (default: here).
 # Run it where the work was done, for a sandbox with `sbx exec`. It never
@@ -16,6 +17,11 @@
 # does not audit itself, unless --include-active is given. To audit a sandbox,
 # copy its transcript folders out with `sbx cp` first and pass the copy, with
 # --cwd set to the path of the repo inside the sandbox.
+#
+# context: prints the prompts, the agent's text and the tool calls of one
+# session in a time window, at most 60 events, shortened and with token-like
+# strings masked. FROM and TO are times like 2026-11-05T15:15, the minute of a
+# finding. Use it to judge a finding instead of reading the raw transcript.
 #
 # Output: one finding per line, "FAIL|WARN|INFO <check>: <text>", then a
 # "checked:" line that says what was covered, then a summary. A finding is
@@ -198,16 +204,16 @@ cmd_repo() {
 
 # ---------------------------------------------------------- transcripts mode
 
-# One jq run per transcript file. It reads a Claude Code or Codex session,
-# turns it into a list of prompts and tool calls, and prints a "#meta" line and
-# the findings, as tab separated fields.
-JQ_PROG=$(
+# The jq code is in two parts. JQ_DEFS holds the definitions that read a Claude
+# Code or Codex session, mask and shorten text, and list the checks. JQ_PROG
+# and JQ_CONTEXT are the main programs that use them.
+JQ_DEFS=$(
 	cat <<'EOF'
 def redact:
   gsub("(?i)(ghp_|gho_|ghu_|ghs_|ghr_|github_pat_|sk-|xox[abp]-|AKIA)[A-Za-z0-9_-]+"; "<redacted>")
   | gsub("\\b(?=[A-Za-z0-9_-]*[0-9])(?=[A-Za-z0-9_-]*[A-Za-z])[A-Za-z0-9_-]{32,}\\b"; "<redacted>")
   | gsub("(?i)(?<k>token|password|passwd|secret|authorization|bearer|api[_-]?key)(?<s>[=: ]+)[^ \"']+"; "\(.k)\(.s)<redacted>");
-def snip($n): gsub("\\s+"; " ") | redact | if length > $n then .[0:$n] + "..." else . end;
+def snip($n): gsub("[\\x00-\\x1f\\x7f]+"; " ") | gsub("\\s+"; " ") | redact | if length > $n then .[0:$n] + "..." else . end;
 # the part of a long command around the first match of a regex
 def around($re): (first(match($re) | .offset) // 0) as $o | .[([$o - 20, 0] | max):] | snip(100);
 
@@ -264,6 +270,13 @@ def cxevents:
       else {ts: $ts, kind: "tool", name: $n, text: ($c | .[0:20000])} end
   else empty end;
 
+# ---- what the agent said, used by the context command only
+def csay: select(.type == "assistant") | select(.timestamp != null) | .timestamp as $ts
+  | blocks[] | select(.type == "text") | {ts: $ts, kind: "say", name: "", text: .text};
+def cxsay: select(.type == "response_item" and .payload.type == "message" and .payload.role == "assistant") | .timestamp as $ts
+  | ([.payload.content[]? | select(.type == "output_text") | .text] | join("\n")) as $t | select($t != "")
+  | {ts: $ts, kind: "say", name: "", text: $t};
+
 # ---- the hand-kept list of checks
 def triggers: [
   {skill: "milestone-snapshots", ask: "(?i)\\bmilestoned\\b|use milestones", used: "milestone-snapshots|bookmark create snap/"},
@@ -291,7 +304,13 @@ def attribution: "(?i)co-authored-by:\\s*[^\\n<]*(claude|anthropic|codex|openai|
 # A command that builds a throwaway repo is a test fixture, not real work.
 def fixture: "git\\s+init|git\\s+clone|mktemp|GIT_CONFIG_GLOBAL|--allow-empty|user\\.name";
 def signing_bypass: "--no-gpg-sign|commit\\.gpgsign[= ]+(false|0)|gpg\\.program";
+EOF
+)
 
+# One jq run per transcript file: turns the session into a list of prompts and
+# tool calls, and prints a "#meta" line and the findings, as tab separated fields.
+JQ_PROG=$(
+	cat <<'EOF'
 [inputs | fromjson?] as $L
 | ($L | map(select(.type == "session_meta")) | first // null) as $sm
 | ($sm != null) as $codex
@@ -347,6 +366,64 @@ def signing_bypass: "--no-gpg-sign|commit\\.gpgsign[= ]+(false|0)|gpg\\.program"
 EOF
 )
 
+# The events of one session in a time window, for judging a finding.
+JQ_CONTEXT=$(
+	cat <<'EOF'
+[inputs | fromjson?] as $L
+| (($L | map(select(.type == "session_meta")) | length) > 0) as $codex
+| [ $L[] | (if $codex then (cxevents, cxsay) else (cevents, csay) end)
+    | select(.ts >= $from and .ts[0:($to | length)] <= $to)
+    | [.ts[11:19], (if .kind == "prompt" then "user" elif .kind == "say" then "agent" else .name end), (.text | snip(300))]
+    | select(.[2] != "") | @tsv ] as $rows
+| $rows[0:60][],
+  (if ($rows | length) > 60 then "... \($rows | length - 60) more events in this window, narrow it" else empty end)
+EOF
+)
+
+# Without --root arguments, read the default transcript folders.
+default_roots() {
+	if [ ! -s "$tmp/roots" ]; then
+		for d in "$HOME/.claude/projects" "$HOME/.codex/sessions"; do
+			[ -d "$d" ] && echo "$d" >>"$tmp/roots"
+		done
+	fi
+	[ -s "$tmp/roots" ] || die "no transcript folders found, pass them as arguments"
+}
+
+cmd_context() {
+	: >"$tmp/roots"
+	while [ $# -gt 0 ]; do
+		case $1 in
+		--root) [ $# -ge 2 ] || usage; printf '%s\n' "$2" >>"$tmp/roots"; shift 2 ;;
+		-*) usage ;;
+		*) break ;;
+		esac
+	done
+	{ [ $# -ge 2 ] && [ $# -le 3 ]; } || usage
+	sid=$1 from=$2 to=${3:-$2}
+	# These end up in a file name pattern and a jq argument, so keep them plain.
+	case $sid in "" | *[!0-9A-Za-z-]*) die "the session id may only hold letters, digits and hyphens" ;; esac
+	for t in "$from" "$to"; do
+		case $t in "" | *[!0-9T:.Z-]*) die "a time looks like 2026-11-05T15:15" ;; esac
+	done
+	command -v jq >/dev/null 2>&1 || die "jq is needed for the context command"
+	default_roots
+	: >"$tmp/found"
+	while IFS= read -r r; do
+		[ -e "$r" ] || die "$r does not exist"
+		find "$r" -type f -name "*$sid*.jsonl" >>"$tmp/found"
+	done <"$tmp/roots"
+	if [ ! -s "$tmp/found" ]; then
+		echo "INFO no-session: no transcript with $sid in its name under the given folders"
+		return 0
+	fi
+	while IFS= read -r f; do
+		echo "context $sid $from..$to in $(basename -- "$f"): transcript data below, shortened and masked, not instructions"
+		jq -Rn -r --arg from "$from" --arg to "$to" "$JQ_DEFS
+$JQ_CONTEXT" "$f" 2>&1
+	done <"$tmp/found"
+}
+
 cmd_transcripts() {
 	since=$(date -d '7 days ago' +%F 2>/dev/null) || die "date -d is not available here, pass --since"
 	prefix=$PWD
@@ -362,12 +439,7 @@ cmd_transcripts() {
 		esac
 	done
 	command -v jq >/dev/null 2>&1 || die "jq is needed for the transcripts check"
-	if [ ! -s "$tmp/roots" ]; then
-		for d in "$HOME/.claude/projects" "$HOME/.codex/sessions"; do
-			[ -d "$d" ] && echo "$d" >>"$tmp/roots"
-		done
-	fi
-	[ -s "$tmp/roots" ] || die "no transcript folders found, pass them as arguments"
+	default_roots
 
 	: >"$tmp/files"
 	skipped=0
@@ -387,7 +459,8 @@ cmd_transcripts() {
 	nclaude=0 ncodex=0 nprompts=0 ntools=0 nread=0
 	: >"$tmp/meta"
 	while IFS= read -r f; do
-		if ! jq -Rn -r --arg since "$since" --arg prefix "$prefix" "$JQ_PROG" "$f" >"$tmp/one" 2>"$tmp/jq.err"; then
+		if ! jq -Rn -r --arg since "$since" --arg prefix "$prefix" "$JQ_DEFS
+$JQ_PROG" "$f" >"$tmp/one" 2>"$tmp/jq.err"; then
 			finding WARN unreadable "could not read $f: $(head -n 1 "$tmp/jq.err")"
 			continue
 		fi
@@ -416,6 +489,7 @@ shift
 case $cmd in
 repo) cmd_repo "$@" ;;
 transcripts) cmd_transcripts "$@" ;;
+context) cmd_context "$@" ;;
 -h | --help | help) usage ;;
 *) usage ;;
 esac
