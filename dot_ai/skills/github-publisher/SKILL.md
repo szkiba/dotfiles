@@ -39,18 +39,22 @@ If a request lacks a field it needs, skip it and tell the user which one.
 
 ## Branches and pull requests
 
-For each branch of a `branches` request, in order, fetch only that branch, and never check it out. Content from the sandbox in your worktree can trigger filters or tool configs, so work from the fetched ref:
+For each branch of a `branches` request, in order, run the check script from the repo. It fetches only that branch and the base, never checks anything out (content from the sandbox in your worktree can trigger filters or tool configs, so everything works from the fetched ref), and prints the commits, the check results and the diffstat. Run it as the only command of the call, with no pipe and no extra commands, so it needs one approval, and do not repeat its checks by hand:
 
-    git -c fetch.fsckObjects=true fetch --no-tags <sandbox remote> "+refs/heads/<branch>:refs/remotes/<sandbox remote>/<branch>"
-    git fetch origin <base>
+    sh ~/.ai/skills/github-publisher/scripts/check-branch.sh <sandbox remote> <branch> <base> [<remote>]
 
-Refuse a branch that starts with `snap/` or `drafts/`, a branch the request does not name, and the default branch itself. Then check the range `<base ref>..<ref>`, where the base ref is `origin/<base>` or the previous branch of the stack:
+The base is the branch the PR targets, such as `develop`. For the second and later branches of a stack it is the previous branch, as `refs/remotes/<sandbox remote>/<previous>`. The remote is the one you push to, `origin` unless the user named another. Pass only branches that the request names. The script refuses `snap/*`, `drafts/*` and the default branch.
 
-1. Signatures: `git log --format='%h %G? %an %s' <range>`. Every line needs G or U. Anything else stops the push.
-2. Messages: none may be empty, since an empty one is a leftover jj commit. Look for AI attribution with `git log --format=%B <range> | grep -i -E 'co-authored-by|generated with'` and show any match to the user as a finding, because a human co-author is legitimate.
-3. Secrets: read the added lines of `git diff <base ref>...<ref>`, and run a scanner such as gitleaks if one is installed. Look for API keys, tokens, passwords, private keys, and credentials in URLs or headers. Never print a suspected value, only its file and type. If anything turns up, stop and report, and do not rewrite history unasked.
-4. Base: for the first branch, `git merge-base --is-ancestor origin/<base> <ref>` must succeed. If it fails, the base moved after the branch was made. Do not rebase here, because that would break the signatures. Tell the user the branch is behind and let them choose between publishing as is and restacking in the sandbox first.
-5. If the branch already exists on the remote (`git ls-remote <remote> refs/heads/<branch>`), the new ref must be a fast-forward of it. If not, a force push is needed: stop and ask. Never use plain `--force`.
+`result: stop` means a FAIL line, and the branch is not pushed. What they mean:
+
+- signatures: every commit needs G or U. Anything else stops the push.
+- messages: an empty one is a leftover jj commit.
+- base: the base moved after the branch was made. Do not rebase here, because that would break the signatures. Tell the user the branch is behind and let them choose between publishing as is and restacking in the sandbox first.
+- remote: the branch already exists there and the new ref is not a fast-forward of it. A force push is needed: stop and ask. Never use plain `--force`.
+
+A `FINDING attribution` line is an AI attribution line in a commit message. Show it to the user, because a human co-author is legitimate. A `WARN` is something the script could not check, such as a remote that did not answer. Say so, and when the base could not be fetched, say how old the copy is.
+
+The script does not scan for secrets. Read the added lines of the `git diff` it names yourself. Look for API keys, tokens, passwords, private keys, and credentials in URLs or headers. Never print a suspected value, only its file and type. If anything turns up, stop and report, and do not rewrite history unasked.
 
 Print the result as normal text: per branch the commit subjects, the diffstat and the check results, and per PR its complete title and description, word for word as the request has them. Only if the request has no description, write one from the commit messages by the PR rules in AGENTS.md and say that you wrote it. Then ask a short question on how to approve, without repeating the text, offering all at once, one by one, or edit first, and propose the scope as AGENTS.md says.
 
@@ -84,7 +88,7 @@ Pass the text on stdin where `--body-file -` is used. Resolve a thread only when
 
 If `gh auth status` fails, or a push or `gh` command fails for lack of credentials, do not look for a token. Do not run `op` or any other tool to get one, and do not change git config. A 1Password shell plugin only works in the user's own terminal, so the failure is expected when one is in use.
 
-Do everything that needs no credentials: the fetch from the sandbox remote and all the checks. If `git fetch origin` fails too, use the `origin/<base>` you already have and say how old it is. Print the results and the PR texts as usual and get the approval. Then print the exact commands for the user to paste into their terminal, one block per branch, with the description on stdin:
+Do everything that needs no credentials: the fetch from the sandbox remote and all the checks. If `git fetch origin` fails too, the script falls back to the `origin/<base>` it already has and warns, and you say how old it is. Print the results and the PR texts as usual and get the approval. Then print the exact commands for the user to paste into their terminal, one block per branch, with the description on stdin:
 
     git push origin refs/remotes/<sandbox remote>/<branch>:refs/heads/<branch>
     gh pr create --repo <repo> --base <base> --head <branch> --title "<title>" --body-file - <<'EOF'
