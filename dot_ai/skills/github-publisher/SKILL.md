@@ -49,7 +49,7 @@ The base is the branch the PR targets, such as `develop`. For the second and lat
 
 A `FINDING attribution` line is an AI attribution line in a commit message. Show it to the user, because a human co-author is legitimate. A `WARN` is something the script could not check, such as a remote that did not answer. Say so, and when the base could not be fetched, say how old the copy is.
 
-The script does not scan for secrets. Read the added lines of the `git diff` it names yourself. Look for API keys, tokens, passwords, private keys, and credentials in URLs or headers. Never print a suspected value, only its file and type. If anything turns up, stop and report, and do not rewrite history unasked.
+Do not scan for secrets: no scanner and no grep or other search, because the GitHub workflow scans. Only read the added lines of the plain `git diff` the script names, with no pipe. If something in them looks like an API key, token, password, private key or credential in a URL or header, stop and report it by file and type, never its value. Do not rewrite history unasked.
 
 Print the result as normal text: per branch the commit subjects, the diffstat and the check results, and per PR its complete title and description, word for word as the request has them. Only if the request has no description, write one from the commit messages by the PR rules in AGENTS.md and say that you wrote it. Then ask a short question on how to approve, without repeating the text, offering all at once, one by one, or edit first, and propose the scope as AGENTS.md says.
 
