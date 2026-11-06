@@ -1,0 +1,6 @@
+{{ if lookPath "sbx" -}}
+#!/bin/sh
+# Refreshes the sbx skill store when a skill changes. Skill files hash:
+# {{ range (glob (joinPath .chezmoi.sourceDir "dot_ai/skills/**/*")) }}{{ if not (stat .).isDir }}{{ include . | sha256sum | trunc 8 }}{{ end }}{{ end }}
+sbx skills import -f --no-input || echo "sbx skills import failed, run it by hand" >&2
+{{ end -}}
