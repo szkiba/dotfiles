@@ -356,7 +356,7 @@ JQ_PROG=$(
 | (if $agent == "codex" then ($sm.payload.cwd // "") elif $agent == "copilot" then ($cs.data.context.cwd // "") else ([$L[] | .cwd | select(. != null)] | first // "") end) as $cwd
 | (if $agent == "codex" then ($sm.payload.id // "") elif $agent == "copilot" then ($cs.data.sessionId // "") else ([$L[] | .sessionId | select(. != null)] | first // "") end) as $sid
 | select($cwd | startswith($prefix))
-| [ $L[] | if $agent == "codex" then cxevents elif $agent == "copilot" then pevents else cevents end ] as $ev
+| [ $L[] | if $agent == "codex" then cxevents elif $agent == "copilot" then pevents else cevents end | select((.kind == "prompt" and (.text | test("^\\s*You are the checker in a maker-checker review"))) | not) ] as $ev
 | ($ev | to_entries) as $E
 | ($sid[0:8]) as $s
 | ($ev | any(.[]; .kind == "tool" and (.text | test("github-publisher")))) as $usedpub
@@ -439,7 +439,7 @@ def epoch: sub("\\.[0-9]+"; "") | (try fromdateiso8601 catch null);
 | (if $agent == "codex" then ($sm.payload.cwd // "") elif $agent == "copilot" then ($cs.data.context.cwd // "") else ([$L[] | .cwd | select(. != null)] | first // "") end) as $cwd
 | (if $agent == "codex" then ($sm.payload.id // "") elif $agent == "copilot" then ($cs.data.sessionId // "") else ([$L[] | .sessionId | select(. != null)] | first // "") end) as $sid
 | select($cwd | startswith($prefix))
-| [ $L[] | if $agent == "codex" then cxevents elif $agent == "copilot" then pevents else cevents end ] as $ev
+| [ $L[] | if $agent == "codex" then cxevents elif $agent == "copilot" then pevents else cevents end | select((.kind == "prompt" and (.text | test("^\\s*You are the checker in a maker-checker review"))) | not) ] as $ev
 | ($sid[0:8]) as $s
 | def gaplines: if $agent == "claude" then select(.type == "user" or .type == "assistant")
     elif $agent == "codex" then select(.type == "response_item")
@@ -458,7 +458,7 @@ def epoch: sub("\\.[0-9]+"; "") | (try fromdateiso8601 catch null);
          cmp: ([ $L[] | select(.type == "system" and .subtype == "compact_boundary") ] | length) }
      elif $agent == "copilot" then
        { err: ([ $L[] | select(.type == "tool.execution_complete" and .data.success == false) ] | length),
-         den: ([ $L[] | select(.type == "permission.completed" and ((.data.result.kind // "approved") != "approved")) ] | length),
+         den: ([ $L[] | select(.type == "permission.completed" and ((.data.result.kind // "approved") | startswith("approved") | not)) ] | length),
          int: ([ $L[] | select((.type | type) == "string" and (.type | test("(?i)abort|cancel|interrupt"))) ] | length),
          cmp: ([ $L[] | select((.type | type) == "string" and (.type | test("(?i)compact"))) ] | length) }
      else { err: "-", den: "-", int: "-", cmp: "-" } end) as $c
