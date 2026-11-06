@@ -4,6 +4,7 @@
 #   audit.sh repo [path]
 #   audit.sh transcripts [--since YYYY-MM-DD] [--cwd PREFIX] [--include-active] [dir-or-file...]
 #   audit.sh context [--root DIR]... SESSION-ID-PREFIX FROM [TO]
+#   audit.sh stats [--since YYYY-MM-DD] [--until YYYY-MM-DD] [--cwd PREFIX] [--include-active] [--skills DIR] [dir-or-file...]
 #
 # repo: looks at the git and jj state of the repo at path (default: here).
 # Run it where the work was done, for a sandbox with `sbx exec`. It never
@@ -23,6 +24,15 @@
 # session in a time window, at most 60 events, shortened and with token-like
 # strings masked. FROM and TO are times like 2026-11-05T15:15, the minute of a
 # finding. Use it to judge a finding instead of reading the raw transcript.
+#
+# stats: counts for the kaizen skill, not findings. Per session: prompts, tool
+# calls, errors, denied permissions, interrupts, compactions and waits of over
+# 5 minutes. Also which skills were used and which installed ones were not, the
+# size of AGENTS.md and the skills, and prompts that look like corrections.
+# The options are those of transcripts, but --since defaults to 14 days ago and
+# --cwd to / (all sessions). --until DATE stops at sessions last written before
+# it, which allows a before and after comparison. --skills DIR is the folder
+# of installed skills (default ~/.ai/skills). Codex files give no error counts.
 #
 # Output: one finding per line, "FAIL|WARN|INFO <check>: <text>", then a
 # "checked:" line that says what was covered, then a summary. A finding is
@@ -229,7 +239,7 @@ def usertext:
 def cevents:
   select(.type == "user" or .type == "assistant") | select(.timestamp != null) |
   if .type == "user" then
-    select((.isSidechain // false) | not) | select((.isMeta // false) | not)
+    select((.isSidechain // false) | not) | select((.isMeta // false) | not) | select((.isCompactSummary // false) | not)
     | select([blocks[] | .type] | all(. != "tool_result"))
     | usertext as $t | select($t != "")
     | {ts: .timestamp, kind: "prompt", name: "", text: $t}
@@ -409,6 +419,73 @@ JQ_CONTEXT=$(
 EOF
 )
 
+# Counts for the kaizen skill: one "#session" line per transcript, one "#skill"
+# line per skill call and one "#corr" line per prompt that may be a correction.
+JQ_STATS=$(
+	cat <<'EOF'
+# A prompt that starts like a correction or says that something was missed.
+# Most hits are not corrections, the one reading them decides.
+def corr: "(?i)(?:^\\s*(?:no|nope|nah|stop|wait|hold on|don.?t|do not|never|wrong|not that|not what|that.?s (?:not|wrong)|this is wrong|i said|i asked|i told|i meant|i already|why did you|why are you|why do you|why would you|you (?:should|shouldn.?t|did not|didn.?t|forgot|missed|ignored|keep)|instead|revert|undo|actually|incorrect|again)\\b|\\b(?:as i said|i already (?:told|said|asked)|i didn.?t ask|not what i (?:asked|wanted|meant)|you forgot|you missed|you ignored|that.?s not what|still (?:not|wrong|fails|failing|broken)|redo|do it again|try again|are you (?:working|there|stuck)|did you (?:hang|freeze)))";
+def denied: "(?i)permission[^.]{0,60}denied|want to proceed|tool use was rejected|denied by the";
+def cresults: select(.type == "user") | blocks[] | select(.type == "tool_result")
+  | {err: (.is_error == true),
+     text: (.content | if type == "array" then (map(if type == "object" then (.text // "") else "" end) | join(" ")) elif type == "string" then . else "" end)};
+def epoch: sub("\\.[0-9]+"; "") | (try fromdateiso8601 catch null);
+
+[inputs | fromjson?] as $L
+| ($L | map(select(.type == "session_meta")) | first // null) as $sm
+| ($L | map(select(.type == "session.start")) | first // null) as $cs
+| (if $sm != null then "codex" elif $cs != null then "copilot" else "claude" end) as $agent
+| (if $agent == "codex" then ($sm.payload.cwd // "") elif $agent == "copilot" then ($cs.data.context.cwd // "") else ([$L[] | .cwd | select(. != null)] | first // "") end) as $cwd
+| (if $agent == "codex" then ($sm.payload.id // "") elif $agent == "copilot" then ($cs.data.sessionId // "") else ([$L[] | .sessionId | select(. != null)] | first // "") end) as $sid
+| select($cwd | startswith($prefix))
+| [ $L[] | if $agent == "codex" then cxevents elif $agent == "copilot" then pevents else cevents end ] as $ev
+| ($sid[0:8]) as $s
+| def gaplines: if $agent == "claude" then select(.type == "user" or .type == "assistant")
+    elif $agent == "codex" then select(.type == "response_item")
+    else select((.type | type) == "string" and (.type | test("^(assistant|tool|permission|model)\\."))) end;
+  ([ $L[] | select((.timestamp | type) == "string") | .timestamp ] | sort) as $times
+  | ($times | first // "") as $first
+  | ($times | last // "") as $last
+  | (if ($times | length) > 1 then (try ((($last | epoch) - ($first | epoch)) / 60 | floor) catch 0) else 0 end) as $mins
+  | (if $agent == "claude" then
+       [ $L[] | select(.type == "user") | select(any(blocks[]; (.type == "text") and ((.text // "") | test("^\\[Request interrupted")))) | .timestamp ]
+     else [] end) as $intts
+  | (if $agent == "claude" then
+       { err: ([ $L[] | cresults | select(.err and ((.text | test(denied)) | not)) ] | length),
+         den: ([ $L[] | cresults | select(.err and (.text | test(denied))) ] | length),
+         int: ($intts | length),
+         cmp: ([ $L[] | select(.type == "system" and .subtype == "compact_boundary") ] | length) }
+     elif $agent == "copilot" then
+       { err: ([ $L[] | select(.type == "tool.execution_complete" and .data.success == false) ] | length),
+         den: ([ $L[] | select(.type == "permission.completed" and ((.data.result.kind // "approved") != "approved")) ] | length),
+         int: ([ $L[] | select((.type | type) == "string" and (.type | test("(?i)abort|cancel|interrupt"))) ] | length),
+         cmp: ([ $L[] | select((.type | type) == "string" and (.type | test("(?i)compact"))) ] | length) }
+     else { err: "-", den: "-", int: "-", cmp: "-" } end) as $c
+  # Waits of over 5 minutes that do not end in a message of the user: a stalled
+  # model call, a long command, or the user away from an approval prompt.
+  | ([ $L[] | gaplines | select((.timestamp | type) == "string") | {ts: .timestamp, e: (.timestamp | epoch)} | select(.e != null) ] | sort_by(.e)) as $G
+  | ($ev | map(select(.kind | IN("prompt", "answer")) | .ts)) as $uts
+  | ([ range(1; ($G | length)) as $k | ($G[$k].e - $G[$k - 1].e) as $gap | select($gap > 300) | select(($uts | any(. == $G[$k].ts)) | not) | $gap ]) as $slow
+  | ( [ $ev[] | select(.kind == "tool" and .name == "Skill") | .text ]
+      + [ $ev[] | select(.kind == "prompt") | .text | capture("^/(?<n>[A-Za-z0-9:_-]+)") | .n | select(. as $n | $installed | any(. == $n)) ] ) as $sk
+  | (["#session", $agent, $s, $first[0:16], ($mins | tostring),
+      ($ev | map(select(.kind == "prompt")) | length | tostring),
+      ($ev | map(select(.kind == "tool")) | length | tostring),
+      ($c.err | tostring), ($c.den | tostring), ($c.int | tostring), ($c.cmp | tostring),
+      ($slow | length | tostring), ((($slow | max // 0) / 60) | floor | tostring), ($cwd | snip(60))] | @tsv),
+    ( $sk[] | ["#skill", $s, .] | @tsv ),
+    ( ($ev | map(select(.kind == "prompt" and .ts >= $since))) as $P
+      | ($P | map(select(.text | test(corr)) | .ts)) as $byre
+      | ([ $intts[] as $i | ($P | map(select(.ts > $i)) | first | .ts // empty) ]) as $byint
+      | $P[] | . as $p
+      | ([ (if ($byre | any(. == $p.ts)) then "words" else empty end),
+           (if ($byint | any(. == $p.ts)) then "after-interrupt" else empty end) ]) as $tags
+      | select(($tags | length) > 0)
+      | ["#corr", $s, $p.ts[0:16], ($tags | join("+")), ($p.text | snip(160))] | @tsv )
+EOF
+)
+
 # Without --root arguments, read the default transcript folders.
 default_roots() {
 	if [ ! -s "$tmp/roots" ]; then
@@ -453,6 +530,35 @@ $JQ_CONTEXT" "$f" 2>&1
 	done <"$tmp/found"
 }
 
+# collect_files: the session files in $tmp/roots written since $since (and
+# before $upto, if set), into $tmp/files. Files written in the last 2 minutes
+# are left out unless $active is set, and counted in $skipped. With $nosub set,
+# the transcripts of subagents are left out too.
+collect_files() {
+	: >"$tmp/files"
+	: >"$tmp/all"
+	skipped=0
+	while IFS= read -r r; do
+		[ -e "$r" ] || die "$r does not exist"
+		if [ -n "${upto:-}" ]; then
+			find "$r" -type f -name '*.jsonl' -newermt "$since" ! -newermt "$upto" >>"$tmp/all"
+		else
+			find "$r" -type f -name '*.jsonl' -newermt "$since" >>"$tmp/all"
+		fi
+	done <"$tmp/roots"
+	if [ -n "${nosub:-}" ]; then
+		grep -v '/subagents/' "$tmp/all" >"$tmp/all2"
+		mv "$tmp/all2" "$tmp/all"
+	fi
+	while IFS= read -r f; do
+		if [ -z "$active" ] && [ -n "$(find "$f" -mmin -2 2>/dev/null)" ]; then
+			skipped=$((skipped + 1))
+		else
+			echo "$f" >>"$tmp/files"
+		fi
+	done <"$tmp/all"
+}
+
 cmd_transcripts() {
 	since=$(date -d '7 days ago' +%F 2>/dev/null) || die "date -d is not available here, pass --since"
 	prefix=$PWD
@@ -470,20 +576,7 @@ cmd_transcripts() {
 	command -v jq >/dev/null 2>&1 || die "jq is needed for the transcripts check"
 	default_roots
 
-	: >"$tmp/files"
-	skipped=0
-	while IFS= read -r r; do
-		[ -e "$r" ] || die "$r does not exist"
-		find "$r" -type f -name '*.jsonl' -newermt "$since" >>"$tmp/all"
-	done <"$tmp/roots"
-	[ -s "$tmp/all" ] || : >"$tmp/all"
-	while IFS= read -r f; do
-		if [ -z "$active" ] && [ -n "$(find "$f" -mmin -2 2>/dev/null)" ]; then
-			skipped=$((skipped + 1))
-		else
-			echo "$f" >>"$tmp/files"
-		fi
-	done <"$tmp/all"
+	collect_files
 
 	nclaude=0 ncodex=0 ncopilot=0 nprompts=0 ntools=0 nread=0
 	: >"$tmp/meta"
@@ -511,6 +604,102 @@ $JQ_PROG" "$f" >"$tmp/one" 2>"$tmp/jq.err"; then
 	report "$nread sessions ($nclaude claude, $ncodex codex, $ncopilot copilot) with working directory under $prefix, written since $since; $nprompts prompts, $ntools tool calls"
 }
 
+# -------------------------------------------------------------- stats mode
+
+cmd_stats() {
+	since=$(date -d '14 days ago' +%F 2>/dev/null) || die "date -d is not available here, pass --since"
+	upto=
+	prefix=/
+	active=
+	nosub=1
+	skills=$HOME/.ai/skills
+	: >"$tmp/roots"
+	while [ $# -gt 0 ]; do
+		case $1 in
+		--since) [ $# -ge 2 ] || usage; since=$2; shift 2 ;;
+		--until) [ $# -ge 2 ] || usage; upto=$2; shift 2 ;;
+		--cwd) [ $# -ge 2 ] || usage; prefix=$2; shift 2 ;;
+		--skills) [ $# -ge 2 ] || usage; skills=$2; shift 2 ;;
+		--include-active) active=1; shift ;;
+		-*) usage ;;
+		*) printf '%s\n' "$1" >>"$tmp/roots"; shift ;;
+		esac
+	done
+	for d in "$since" "$upto"; do
+		case $d in "" | [0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]) ;; *) die "a date looks like 2026-11-05" ;; esac
+	done
+	command -v jq >/dev/null 2>&1 || die "jq is needed for the stats command"
+	[ -d "$skills" ] || die "$skills is not a folder, pass --skills"
+	default_roots
+	installed=$(ls -1 "$skills" | jq -R -s -c 'split("\n") | map(select(. != ""))') || die "cannot list $skills"
+
+	collect_files
+	: >"$tmp/stat.out"
+	nbad=0
+	while IFS= read -r f; do
+		if jq -Rn -r --arg since "$since" --arg prefix "$prefix" --argjson installed "$installed" "$JQ_DEFS
+$JQ_STATS" "$f" >"$tmp/one" 2>"$tmp/jq.err"; then
+			cat "$tmp/one" >>"$tmp/stat.out"
+		else
+			nbad=$((nbad + 1))
+		fi
+	done <"$tmp/files"
+
+	tab=$(printf '\t')
+	grep "^#session${tab}" "$tmp/stat.out" >"$tmp/sessions"
+	window="written since $since"
+	[ -z "$upto" ] || window="$window and before $upto"
+	if [ ! -s "$tmp/sessions" ]; then
+		echo "stats: no session found with working directory under $prefix, $window"
+		[ "$nbad" -eq 0 ] || echo "note: $nbad file(s) could not be read"
+		return 0
+	fi
+	awk -F'\t' -v prefix="$prefix" -v window="$window" '
+		{ a[$2]++; p += $6; t += $7; e += $8; d += $9; i += $10; c += $11; s += $12; n++ }
+		END {
+			printf "stats: %d sessions (%d claude, %d codex, %d copilot) with working directory under %s, %s\n", n, a["claude"], a["codex"], a["copilot"], prefix, window
+			printf "totals: prompts=%d tool-calls=%d errors=%d denied=%d interrupts=%d compactions=%d slow-waits=%d\n", p, t, e, d, i, c, s
+		}' "$tmp/sessions"
+
+	rules=$(dirname -- "$skills")/AGENTS.md
+	line="size in lines:"
+	[ ! -f "$rules" ] || line="$line AGENTS.md $(wc -l <"$rules"),"
+	for d in "$skills"/*/; do
+		[ -f "${d}SKILL.md" ] && line="$line $(basename -- "$d") $(wc -l <"${d}SKILL.md"),"
+	done
+	echo "${line%,}"
+
+	grep "^#skill${tab}" "$tmp/stat.out" | awk -F'\t' '
+		{ calls[$3]++; if (!(($2 SUBSEP $3) in seen)) { seen[$2 SUBSEP $3] = 1; sess[$3]++ } }
+		END { for (n in calls) printf "%d\t%d\t%s\n", sess[n], calls[n], n }' | sort -t "$tab" -k1,1nr -k3 >"$tmp/skillsused"
+	echo "skills used:"
+	if [ -s "$tmp/skillsused" ]; then
+		awk -F'\t' '{ printf "  %s: %d sessions, %d calls\n", $3, $1, $2 }' "$tmp/skillsused"
+	else
+		echo "  none"
+	fi
+	unused=
+	for d in "$skills"/*/; do
+		n=$(basename -- "$d")
+		awk -F'\t' -v n="$n" '$3 == n { f = 1 } END { exit !f }' "$tmp/skillsused" || unused="$unused $n"
+	done
+	echo "installed skills not used in the sessions read:${unused:- none}"
+
+	echo "sessions with the most friction (denied x3, interrupts x2, compactions, slow waits):"
+	awk -F'\t' '{ printf "%d\t%s\n", $9 * 3 + $10 * 2 + $11 + $12, $0 }' "$tmp/sessions" | sort -t "$tab" -k1,1nr | head -n 8 |
+		awk -F'\t' '$1 > 0 { printf "  %s %s %s %sm prompts=%s tools=%s errors=%s denied=%s interrupts=%s compactions=%s slow-waits=%s (slowest %sm) %s\n", $4, $3, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15 }'
+
+	grep "^#corr${tab}" "$tmp/stat.out" >"$tmp/corr"
+	nc=$(wc -l <"$tmp/corr")
+	echo "prompts that may be corrections: $nc (they start like one or follow an interrupt, most are not, judge each with the context command)"
+	head -n 40 "$tmp/corr" | awk -F'\t' '{ printf "  %s %s [%s] \"%s\"\n", $2, $3, $4, $5 }'
+	[ "$nc" -le 40 ] || echo "  ... $((nc - 40)) more"
+
+	[ "$skipped" -eq 0 ] || echo "note: $skipped session file(s) written in the last 2 minutes were skipped, use --include-active to read them"
+	[ "$nbad" -eq 0 ] || echo "note: $nbad file(s) could not be read"
+	return 0
+}
+
 # --------------------------------------------------------------------- main
 
 [ $# -ge 1 ] || usage
@@ -520,6 +709,7 @@ case $cmd in
 repo) cmd_repo "$@" ;;
 transcripts) cmd_transcripts "$@" ;;
 context) cmd_context "$@" ;;
+stats) cmd_stats "$@" ;;
 -h | --help | help) usage ;;
 *) usage ;;
 esac

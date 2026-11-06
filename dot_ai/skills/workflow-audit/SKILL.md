@@ -28,7 +28,7 @@ Settle three things with the user, asking only for what is missing: the repo, wh
 
 ## Run the checks
 
-The script is `~/.ai/skills/workflow-audit/scripts/audit.sh` and has two modes. Both print one finding per line as `FAIL`, `WARN` or `INFO`, then a `checked:` line that says what was covered.
+The script is `~/.ai/skills/workflow-audit/scripts/audit.sh` and has two checking modes, `repo` and `transcripts`, which print one finding per line as `FAIL`, `WARN` or `INFO`, then a `checked:` line that says what was covered. The `context` command below helps judge a finding. A fourth mode, `stats`, prints counts for the kaizen skill and no findings.
 
 Repo state, run where the work was done, because `.ai/maker-checker/` and the jj snapshots exist only in that clone. For a sandbox, feed the script over stdin, which works without the skill being mounted there. The login shell prints a banner first, ignore it:
 
