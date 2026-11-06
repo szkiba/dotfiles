@@ -103,3 +103,5 @@ Say plainly that nothing was pushed or posted. A reply or new comment cannot be 
 ## Record and report
 
 After each approved action, append a line to `.ai/github-publisher/log.md` with the absolute date, the action and its URL. Then report in a few lines what was pushed and posted, with links, what was skipped and why, and what is left in the inbox. The request files stay in `.ai/github-publisher/`, so the sandbox can be removed without losing them.
+
+Last, keep the sandbox's evidence for the audit and kaizen skills. From the repo, run `sh ~/.ai/skills/workflow-audit/scripts/archive.sh <sandbox>`. It copies the session transcripts, the review files and a repo report to `~/.local/state/agent-archive/` and prints only paths and counts. Do not open the copied files, because transcripts can hold secrets. Run it every time you publish, and again after later work in the sandbox. If it fails, tell the user and go on, since the publishing is done.

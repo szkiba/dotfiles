@@ -27,9 +27,11 @@ Edit only files under `dot_ai/` in the chezmoi source, and only what the user ap
 
 ## Collect the evidence
 
-Settle the period (default the last 14 days) and which sandboxes to include, asking only for what is missing. Sandbox transcripts are gone when the sandbox is removed, so for one that no longer exists the evidence is only what was copied out earlier. For the others, copy the session folders out as workflow-audit explains (`sbx cp` into a folder from `mktemp -d`) and delete the copy at the end. Then run the counts and the checks over all transcript folders. When folders are given, the defaults are not read, so list the host ones too, those that exist:
+Settle the period (default the last 14 days) and which repos and sandboxes to include, asking only for what is missing. The transcripts of a sandbox can be lost when it is removed, so the evidence for sandboxes comes from the archive in `~/.local/state/agent-archive/`, which github-publisher refreshes every time it runs. For a sandbox that still exists, refresh it first with `sh ~/.ai/skills/workflow-audit/scripts/archive.sh <sandbox>`, run from its repo (`sbx ls` lists the sandboxes). Work done after the last refresh is not in the archive, and archives older than 8 weeks are deleted. Then run the counts and the checks over all transcript folders. When folders are given, the defaults are not read, so list the host ones too, those that exist, and the archived ones:
 
-    f="$HOME/.claude/projects $HOME/.codex/sessions $HOME/.copilot/session-state $stage"
+    a=${AGENT_ARCHIVE_DIR:-$HOME/.local/state/agent-archive}
+    f="$HOME/.claude/projects $HOME/.codex/sessions $HOME/.copilot/session-state"
+    for d in "$a"/*/*/claude "$a"/*/*/codex; do [ -d "$d" ] && f="$f $d"; done
     sh ~/.ai/skills/workflow-audit/scripts/audit.sh stats [--since YYYY-MM-DD] [--until YYYY-MM-DD] [--include-active] $f
     sh ~/.ai/skills/workflow-audit/scripts/audit.sh transcripts --cwd / [--since YYYY-MM-DD] [--include-active] $f
 
@@ -66,4 +68,4 @@ Keep it short and plain. Start with what was read, from the `stats:` line, and w
 
 ## What it cannot see
 
-The correction words are a rough filter. It misses polite or indirect corrections and flags many prompts that are not. Codex files give no error, denial or skill counts, and the Copilot denial and interrupt counts are guesses from event names. A skill that was used by running its script without the Skill tool is not counted. Work from sandboxes is visible only in transcripts that were copied out. The script cannot say why a wait was long, or what the user changed by hand.
+The correction words are a rough filter. It misses polite or indirect corrections and flags many prompts that are not. Codex files give no error, denial or skill counts, and the Copilot denial and interrupt counts are guesses from event names. A skill that was used by running its script without the Skill tool is not counted. Work from sandboxes is visible only in the archive, so what happened after the last archive run is missing. The script cannot say why a wait was long, or what the user changed by hand.
