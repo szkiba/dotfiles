@@ -27,7 +27,7 @@
 #
 # stats: counts for the kaizen skill, not findings. Per session: prompts, tool
 # calls, errors, denied permissions, interrupts, compactions and waits of over
-# 5 minutes. Also which skills were used and which installed ones were not, the
+# 5 minutes, and for Copilot the permission prompts asked. Also which skills were used and which installed ones were not, the
 # size of AGENTS.md and the skills, and prompts that look like corrections.
 # The options are those of transcripts, but --since defaults to 14 days ago and
 # --cwd to / (all sessions). --until DATE stops at sessions last written before
@@ -455,13 +455,14 @@ def epoch: sub("\\.[0-9]+"; "") | (try fromdateiso8601 catch null);
        { err: ([ $L[] | cresults | select(.err and ((.text | test(denied)) | not)) ] | length),
          den: ([ $L[] | cresults | select(.err and (.text | test(denied))) ] | length),
          int: ($intts | length),
-         cmp: ([ $L[] | select(.type == "system" and .subtype == "compact_boundary") ] | length) }
+         cmp: ([ $L[] | select(.type == "system" and .subtype == "compact_boundary") ] | length), ask: "-" }
      elif $agent == "copilot" then
        { err: ([ $L[] | select(.type == "tool.execution_complete" and .data.success == false) ] | length),
          den: ([ $L[] | select(.type == "permission.completed" and ((.data.result.kind // "approved") | startswith("approved") | not)) ] | length),
          int: ([ $L[] | select((.type | type) == "string" and (.type | test("(?i)abort|cancel|interrupt"))) ] | length),
-         cmp: ([ $L[] | select((.type | type) == "string" and (.type | test("(?i)compact"))) ] | length) }
-     else { err: "-", den: "-", int: "-", cmp: "-" } end) as $c
+         cmp: ([ $L[] | select((.type | type) == "string" and (.type | test("(?i)compact"))) ] | length),
+         ask: ([ $L[] | select(.type == "permission.requested") ] | length) }
+     else { err: "-", den: "-", int: "-", cmp: "-", ask: "-" } end) as $c
   # Waits of over 5 minutes that do not end in a message of the user: a stalled
   # model call, a long command, or the user away from an approval prompt.
   | ([ $L[] | gaplines | select((.timestamp | type) == "string") | {ts: .timestamp, e: (.timestamp | epoch)} | select(.e != null) ] | sort_by(.e)) as $G
@@ -473,7 +474,7 @@ def epoch: sub("\\.[0-9]+"; "") | (try fromdateiso8601 catch null);
       ($ev | map(select(.kind == "prompt")) | length | tostring),
       ($ev | map(select(.kind == "tool")) | length | tostring),
       ($c.err | tostring), ($c.den | tostring), ($c.int | tostring), ($c.cmp | tostring),
-      ($slow | length | tostring), ((($slow | max // 0) / 60) | floor | tostring), ($cwd | snip(60))] | @tsv),
+      ($slow | length | tostring), ((($slow | max // 0) / 60) | floor | tostring), ($cwd | snip(60)), ($c.ask | tostring)] | @tsv),
     ( $sk[] | ["#skill", $s, .] | @tsv ),
     ( ($ev | map(select(.kind == "prompt" and .ts >= $since))) as $P
       | ($P | map(select(.text | test(corr)) | .ts)) as $byre
@@ -655,10 +656,10 @@ $JQ_STATS" "$f" >"$tmp/one" 2>"$tmp/jq.err"; then
 		return 0
 	fi
 	awk -F'\t' -v prefix="$prefix" -v window="$window" '
-		{ a[$2]++; p += $6; t += $7; e += $8; d += $9; i += $10; c += $11; s += $12; n++ }
+		{ a[$2]++; p += $6; t += $7; e += $8; d += $9; i += $10; c += $11; s += $12; if ($15 != "-") k += $15; n++ }
 		END {
 			printf "stats: %d sessions (%d claude, %d codex, %d copilot) with working directory under %s, %s\n", n, a["claude"], a["codex"], a["copilot"], prefix, window
-			printf "totals: prompts=%d tool-calls=%d errors=%d denied=%d interrupts=%d compactions=%d slow-waits=%d\n", p, t, e, d, i, c, s
+			printf "totals: prompts=%d tool-calls=%d errors=%d denied=%d interrupts=%d compactions=%d slow-waits=%d copilot-permission-prompts=%d\n", p, t, e, d, i, c, s, k
 		}' "$tmp/sessions"
 
 	rules=$(dirname -- "$skills")/AGENTS.md
@@ -688,6 +689,9 @@ $JQ_STATS" "$f" >"$tmp/one" 2>"$tmp/jq.err"; then
 	echo "sessions with the most friction (denied x3, interrupts x2, compactions, slow waits):"
 	awk -F'\t' '{ printf "%d\t%s\n", $9 * 3 + $10 * 2 + $11 + $12, $0 }' "$tmp/sessions" | sort -t "$tab" -k1,1nr | head -n 8 |
 		awk -F'\t' '$1 > 0 { printf "  %s %s %s %sm prompts=%s tools=%s errors=%s denied=%s interrupts=%s compactions=%s slow-waits=%s (slowest %sm) %s\n", $4, $3, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15 }'
+
+	echo "permission prompts asked in Copilot sessions:"
+	awk -F'\t' '$2 == "copilot" { printf "  %s %s %sm asked=%s\n", $3, $4, $5, $15; f = 1 } END { if (!f) print "  none" }' "$tmp/sessions" | sort
 
 	grep "^#corr${tab}" "$tmp/stat.out" >"$tmp/corr"
 	nc=$(wc -l <"$tmp/corr")
