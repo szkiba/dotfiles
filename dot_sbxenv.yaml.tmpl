@@ -46,6 +46,11 @@ additionalWorkspaces:
     readOnly: true
   - path: /hub/all
     readOnly: true
+[[- if stat (joinPath .chezmoi.homeDir "knowledge") ]]
+# notes saved from earlier sessions, only where ~/knowledge exists
+  - path: /home/agent/knowledge
+    readOnly: true
+[[- end ]]
   - path: /home/agent/.config/jj/config.toml
     readOnly: true
 
