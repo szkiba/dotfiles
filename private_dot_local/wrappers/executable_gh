@@ -9,6 +9,10 @@ self=$(cd "${0%/*}" && pwd)
 p=":$PATH:"; p=${p//":$self:"/:}; p=${p#:}
 PATH=${p%:}
 
+# gh starts a pager when stdout is a terminal, which hangs agents and scripts
+# that run in a pty and wait for a "q". Set GH_PAGER yourself to override.
+export GH_PAGER=${GH_PAGER:-cat}
+
 # Without 1Password (for example inside a sandbox) just run the real gh.
 if ! command -v op >/dev/null 2>&1; then
   exec gh "$@"

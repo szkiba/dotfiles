@@ -1,0 +1,15 @@
+#!/bin/sh
+# Used as $PAGER. People get the first modern pager installed. Agents and
+# sandboxes get cat, because they often run in a pty and would wait forever for
+# a "q". The check runs when the pager starts, so it still works when the agent
+# inherited PAGER from the shell that launched it.
+if [ -n "$AI_AGENT" ] || [ -n "$CLAUDECODE" ] || [ "$IS_SANDBOX" = 1 ]; then
+  exec cat "$@"
+fi
+# Preference order, first one installed wins. The first word is looked up.
+for p in "moor" "ov -F" "less -R"; do
+  if command -v "${p%% *}" >/dev/null 2>&1; then
+    exec $p "$@"
+  fi
+done
+exec cat "$@"

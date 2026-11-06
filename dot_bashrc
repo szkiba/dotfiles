@@ -34,6 +34,9 @@ fi
 # Detect and export $EDITOR.
 . ~/.config/bash/editor.sh
 
+# moor for people, cat for agents (see safe-pager). git, man, delta and bat all read $PAGER.
+export PAGER=$HOME/.local/bin/safe-pager
+
 # Only set when the CloudBox sync has actually delivered the vault key.
 if [ -f ~/Documents/CloudBox/keys/ansible-vault-password ]; then
   export ANSIBLE_VAULT_PASSWORD_FILE=$HOME/Documents/CloudBox/keys/ansible-vault-password
@@ -50,5 +53,4 @@ _p=":$PATH:"; _p=${_p//":$_wrappers:"/:}; PATH="$_wrappers${_p%:}"
 unset -f gh
 unset _wrappers _p
 
-unset PAGER
 unalias c
