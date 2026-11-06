@@ -68,4 +68,4 @@ Write the replies by the style rules in AGENTS.md: short and human, no thanks or
 
 ## Report
 
-Tell the user in a few lines which points were fixed, which were declined and why, and which wait for their answer, and name the draft files. Say that nothing was pushed or posted, and that the next step is the github-publisher skill on the host.
+Tell the user in a few lines which points were fixed, which were declined and why, and which wait for their answer, and name the draft files. Say that nothing was pushed or posted. Every time you finish a round, end the report with one plain line for the next step: run github-publisher on the host, which shows the exact texts and asks for the approval. Say if anything still waits for the user here, such as wording to confirm, and if nothing does, say so.
