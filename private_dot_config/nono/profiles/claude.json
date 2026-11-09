@@ -1,0 +1,39 @@
+{
+  "extends": "agent-base",
+  "meta": {
+    "name": "claude",
+    "description": "Claude Code under nono"
+  },
+  "groups": {
+    "include": [
+      "claude_code_linux",
+      "claude_cache_linux"
+    ]
+  },
+  "filesystem": {
+    "allow": [
+      "$HOME/.claude",
+      "$HOME/.local/share/claude"
+    ],
+    "allow_file": [
+      "$HOME/.claude.json"
+    ]
+  },
+  "network": {
+    "allow_domain": [
+      "api.anthropic.com",
+      "*.anthropic.com",
+      "claude.ai",
+      "*.claude.ai",
+      "claude.com",
+      "*.claude.com"
+    ]
+  },
+  "open_urls": {
+    "allow_origins": [
+      "https://claude.ai",
+      "https://platform.claude.com"
+    ],
+    "allow_localhost": true
+  }
+}

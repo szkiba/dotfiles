@@ -1,0 +1,45 @@
+{
+  "extends": "linux-host-compat",
+  "meta": {
+    "name": "agent-base",
+    "description": "Shared base for the coding agent profiles: project dir, git and jj config, toolchains, dev network allowlist"
+  },
+  "workdir": {
+    "access": "readwrite"
+  },
+  "groups": {
+    "include": [
+      "git_config",
+      "user_caches_linux",
+      "node_runtime",
+      "go_runtime",
+      "go_runtime_linux",
+      "python_runtime"
+    ]
+  },
+  "filesystem": {
+    "read": [
+      "$HOME/.ai",
+      "$HOME/.config/jj",
+      "/hub/all"
+    ],
+    "read_file": [
+      "$HOME/.gitconfig-machine"
+    ]
+  },
+  "network": {
+    "allow_domain": [
+      "github.com",
+      "api.github.com",
+      "codeload.github.com",
+      "*.githubusercontent.com",
+      "proxy.golang.org",
+      "sum.golang.org",
+      "go.dev",
+      "dl.google.com",
+      "registry.npmjs.org",
+      "pypi.org",
+      "files.pythonhosted.org"
+    ]
+  }
+}

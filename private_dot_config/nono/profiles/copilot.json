@@ -1,0 +1,25 @@
+{
+  "extends": "agent-base",
+  "meta": {
+    "name": "copilot",
+    "description": "GitHub Copilot CLI under nono"
+  },
+  "filesystem": {
+    "allow": [
+      "$HOME/.copilot"
+    ]
+  },
+  "network": {
+    "allow_domain": [
+      "api.githubcopilot.com",
+      "*.githubcopilot.com",
+      "copilot-proxy.githubusercontent.com"
+    ]
+  },
+  "open_urls": {
+    "allow_origins": [
+      "https://github.com"
+    ],
+    "allow_localhost": true
+  }
+}

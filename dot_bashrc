@@ -34,6 +34,9 @@ fi
 # Detect and export $EDITOR.
 . ~/.config/bash/editor.sh
 
+# nono run/shell/wrap share the working directory without asking.
+. ~/.config/bash/nono.sh
+
 # moor for people, cat for agents (see safe-pager). git, man, delta and bat all read $PAGER.
 export PAGER=$HOME/.local/bin/safe-pager
 

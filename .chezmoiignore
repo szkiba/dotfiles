@@ -7,6 +7,11 @@ test-prompt.sh
 .config/sandboxes
 {{ end -}}
 
+# nono profiles, only where nono is installed
+{{ if not (lookPath "nono") -}}
+.config/nono
+{{ end -}}
+
 # SSH private key material — never manage in dotfiles
 .ssh/id_*
 .ssh/*_rsa

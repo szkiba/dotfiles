@@ -1,0 +1,28 @@
+{
+  "extends": "agent-base",
+  "meta": {
+    "name": "codex",
+    "description": "Codex CLI under nono"
+  },
+  "filesystem": {
+    "allow": [
+      "$HOME/.codex",
+      "$HOME/.agents"
+    ]
+  },
+  "network": {
+    "allow_domain": [
+      "api.openai.com",
+      "auth.openai.com",
+      "chatgpt.com",
+      "*.chatgpt.com",
+      "*.openai.com"
+    ]
+  },
+  "open_urls": {
+    "allow_origins": [
+      "https://auth.openai.com"
+    ],
+    "allow_localhost": true
+  }
+}
