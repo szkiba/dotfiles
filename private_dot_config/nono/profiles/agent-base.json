@@ -20,6 +20,7 @@
   "filesystem": {
     "read": [
       "$HOME/.ai",
+      "$HOME/.config/git",
       "$HOME/.config/jj",
       "$HOME/.local/wrappers",
       "/hub/all"
