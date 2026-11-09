@@ -1,7 +1,6 @@
 #!/bin/sh
-# Setup for the github-publisher skill, in one command: checks that this is the
-# host, finds the sandbox remote, and copies the new request files out of the
-# sandbox, so the setup costs one approval instead of one per command.
+# Setup step of github-publish: checks that this is the host, finds the sandbox
+# remote, and copies the new request files out of the sandbox.
 #
 #   prepare.sh [<sandbox-remote>]
 #
@@ -9,7 +8,7 @@
 # named sandbox-<name> that has a git://127.0.0.1: URL, and stops if there are
 # none or several. It checks that sbx is installed and that git ignores .ai (the
 # request files must stay out of git), and reports whether gh is logged in, which
-# is not fatal because the skill has a path for it. Then it copies the sandbox's
+# is not fatal for this step. Then it copies the sandbox's
 # .ai/github-publisher/ to a staging folder and moves the request files into the
 # repo's .ai/github-publisher/. Only regular files named
 # <topic>-<branches|replies|new>-<n>.md of at most 256 KB are taken, so never
@@ -70,7 +69,7 @@ if command -v gh >/dev/null 2>&1; then
 	if gh auth status >/dev/null 2>&1; then
 		gh_state="logged in"
 	else
-		gh_state="not logged in (see When GitHub auth fails in the skill)"
+		gh_state="not logged in (log in, then run github-publish again)"
 	fi
 else
 	gh_state="not installed"

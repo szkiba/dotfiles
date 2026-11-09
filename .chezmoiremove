@@ -1,0 +1,7 @@
+# Files an earlier version installed and that no longer exist in the source.
+# chezmoi does not delete these by itself. Remove these lines once every machine
+# has applied this.
+.ai/skills/github-publisher
+.claude/skills/github-publisher
+.codex/skills/github-publisher
+.copilot/skills/github-publisher

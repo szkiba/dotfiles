@@ -36,7 +36,7 @@
 # of installed skills (default ~/.ai/skills). Codex files give no error counts.
 # It ends with a "publishing:" block of counts from the publish log, see below.
 #
-# publish: reads the log that publish.sh keeps of what it posted and what it left
+# publish: reads the log that github-publish keeps of what it posted and what it left
 # alone (default ~/.local/state/github-publish/log.jsonl, or $PUBLISH_LOG_DIR, or
 # --log FILE). It takes the runs that started in a repo under --cwd (default the
 # current directory), since --since (default 7 days ago) and before --until. Run
@@ -206,7 +206,7 @@ cmd_repo() {
 	while IFS=$tab read -r kind c a b; do
 		case $kind in
 		UNSIGNED) finding WARN unsigned "commit $c \"$a\" is on a branch that is meant to be published but is not signed" ;;
-		SIGODD) finding WARN signature "commit $c \"$a\" has signature status $b, github-publisher accepts only G or U" ;;
+		SIGODD) finding WARN signature "commit $c \"$a\" has signature status $b, github-publish accepts only G or U" ;;
 		NOMSG) finding WARN no-message "commit $c on a publishable branch has an empty message, probably a leftover jj commit" ;;
 		esac
 	done <"$tmp/sig.out"
@@ -329,8 +329,7 @@ def triggers: [
   {skill: "milestone-snapshots", ask: "(?i)\\bmilestoned\\b|use milestones", used: "milestone-snapshots|bookmark create snap/"},
   {skill: "maker-checker", ask: "(?i)maker-checker|checker review|ask (codex|claude) for a review", used: "maker-checker|run-checker\\.sh|check-isolation\\.sh"},
   {skill: "commit-curator", ask: "(?i)\\bcurate\\b|prepare (the )?(commits|stacked)|stacked branch", used: "commit-curator|snap/[^ ]*-raw"},
-  {skill: "github-responder", ask: "(?i)(apply|address|answer)\\b.{0,40}(review comments|pr comments|the issue)", used: "github-responder|\\.ai/github-publisher/"},
-  {skill: "github-publisher", ask: "(?i)\\bpublish\\b.{0,40}(sandbox|branches|replies|drafts)|open (the )?prs? for", used: "github-publisher"}
+  {skill: "github-responder", ask: "(?i)(apply|address|answer)\\b.{0,40}(review comments|pr comments|the issue)", used: "github-responder|\\.ai/github-publisher/"}
 ];
 # A command starts a line, follows ; & | ( { or then/do/else, so that a name in
 # prose or inside quotes is not taken for a command.
@@ -368,7 +367,6 @@ JQ_PROG=$(
 | [ $L[] | if $agent == "codex" then cxevents elif $agent == "copilot" then pevents else cevents end | select((.kind == "prompt" and (.text | test("^\\s*You are the checker in a maker-checker review"))) | not) ] as $ev
 | ($ev | to_entries) as $E
 | ($sid[0:8]) as $s
-| ($ev | any(.[]; .kind == "tool" and (.text | test("github-publisher")))) as $usedpub
 | def where($e): "\($s) \($e.ts[0:16])";
   def prevprompt($i): ([$E[] | select(.key < $i and (.value.kind | IN("prompt", "answer"))) | (if .value.kind == "answer" then "approval: " else "" end) + .value.text] | last // "") | snip(50);
   (["#meta", $agent, $s, $cwd,
@@ -408,8 +406,8 @@ JQ_PROG=$(
       ( ( if $e.name == "Bash" and ($e.text | test(outbound)) then ($e.text | around(outbound))
           elif ($e.name | test(mcp_write)) then "\($e.name) \($e.text | snip(60))"
           else empty end) as $what
-        | [ (if $usedpub then "INFO" else "WARN" end), "outbound-write",
-            "\(where($e)): `\($what)`, \(if $usedpub then "the session used github-publisher, " else "no sign of github-publisher, " end)check that the user approved it (after prompt \"\(prevprompt($i))\")"] | @tsv )
+        | [ "WARN", "outbound-write",
+            "\(where($e)): `\($what)`, check that the user approved it (after prompt \"\(prevprompt($i))\")"] | @tsv )
   )
 EOF
 )
@@ -698,7 +696,7 @@ cmd_publish() {
 	done
 	command -v jq >/dev/null 2>&1 || die "jq is needed for the publish check"
 	if [ ! -f "$publog" ]; then
-		finding INFO no-publish-log "there is no publish log at $publog, so nothing was posted with publish.sh on this machine, or this is not the host"
+		finding INFO no-publish-log "there is no publish log at $publog, so nothing was posted with github-publish on this machine, or this is not the host"
 		report "no publish log"
 		return
 	fi
@@ -712,7 +710,7 @@ $JQ_PUBFIND" "$tmp/pub.jsonl" >>"$out" 2>"$tmp/jq.err" || finding WARN unreadabl
 	fi
 	nruns=$(jq -r 'select(.action == "run-start") | .run' "$tmp/pub.jsonl" 2>/dev/null | wc -l)
 	nposted=$(jq -r 'select((.action | IN("reply", "comment", "issue")) or (.action == "branch" and .result == "ok")) | .action' "$tmp/pub.jsonl" 2>/dev/null | wc -l)
-	report "$nruns publish run(s) in repos under $prefix since $since in $publog, $nposted post(s). It holds only what publish.sh did: a GitHub write by an agent itself is not here, see the transcripts check"
+	report "$nruns publish run(s) in repos under $prefix since $since in $publog, $nposted post(s). It holds only what github-publish did: a GitHub write by an agent itself is not here, see the transcripts check"
 }
 
 # -------------------------------------------------------------- stats mode

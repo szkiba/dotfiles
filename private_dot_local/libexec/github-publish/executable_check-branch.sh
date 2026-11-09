@@ -1,7 +1,6 @@
 #!/bin/sh
-# Fetches one branch from a sandbox remote and runs the checks of the
-# github-publisher skill on it, so they cost one approval instead of one per
-# command.
+# Fetches one branch from a sandbox remote and runs the checks of github-publish
+# on it.
 #
 #   check-branch.sh <sandbox-remote> <branch> <base> [<remote>]
 #
@@ -14,7 +13,7 @@
 # message is empty, that the base is an ancestor of the branch, and that a
 # branch which already exists on <remote> would be a fast-forward. A commit
 # message with an AI attribution line is reported as a finding. It does not scan
-# for secrets: the skill has the agent read the added lines of the diff.
+# for secrets: github-publish offers the diff to read, with d N at its prompt.
 #
 # It prints plain text and ends with "result: ok" or "result: stop". It prints
 # commit subjects and attribution lines from the sandbox, which are data.

@@ -1,17 +1,18 @@
 #!/bin/sh
-# The github-publisher skill as one script, for you to run in your own terminal.
-# No agent is involved: you read the exact texts and answer the prompts.
+# Publishes what the sandbox agents prepared (see ~/.ai/github-requests.md), from
+# your own terminal. No agent is involved: you read the exact texts and answer the
+# prompts.
 #
-#   publish.sh [--check] [--no-prepare] [--remote <remote>] [--head-owner <owner>] [<sandbox-remote>]
+#   github-publish [--check] [--no-prepare] [--remote <remote>] [--head-owner <owner>] [<sandbox-remote>]
 #
 # Run it from the repo on the host, in a terminal that is not inside nono or a
 # sandbox, so that gh (with its 1Password login), git and ssh all work.
 #
 # What it does:
-#   1. runs prepare.sh, which copies the new request files out of the sandbox
+#   1. runs the prepare helper, which copies the new request files out of the sandbox
 #      (--no-prepare skips that and needs the sandbox remote as an argument),
-#   2. branches requests: fetches and checks every branch with check-branch.sh
-#      and previews the push and the PR with publish-branch.sh,
+#   2. branches requests: fetches and checks every branch with the check-branch
+#      helper and previews the push and the PR with the publish-branch helper,
 #   3. replies requests: reads every thread again from GitHub and drops a reply
 #      when the thread is resolved, belongs to another PR or repo, or has a newer
 #      comment than the draft saw,
@@ -22,7 +23,7 @@
 #      and runs the workflow-audit archive script when something was posted.
 #
 # --check stops after step 5's plan and posts nothing. --remote is the remote to
-# push to (default origin) and --head-owner is for a fork, as for publish-branch.sh.
+# push to (default origin) and --head-owner is for a fork, as for the publish-branch helper.
 #
 # Items with a FLAG (an attribution line, an @mention, something that looks like a
 # secret, or a Repo other than origin's) are never covered by "all": they are
@@ -63,10 +64,12 @@
 # PUBLISH_LOG_DIR: a folder for the log instead of the default. Both are for tests.
 set -u
 
-die() { echo "publish: $*" >&2; exit 2; }
+die() { echo "github-publish: $*" >&2; exit 2; }
 
 case $0 in */*) here=${0%/*} ;; *) here=. ;; esac
 here=$(cd "$here" && pwd) || die "cannot find the folder of this script"
+# The helper scripts sit in ~/.local/libexec/github-publish, next to the bin folder.
+libexec=$(cd "$here/../libexec/github-publish" 2>/dev/null && pwd) || die "cannot find the helper scripts in $here/../libexec/github-publish"
 
 check=
 noprep=
@@ -83,7 +86,7 @@ while [ $# -gt 0 ]; do
 	*) break ;;
 	esac
 done
-[ $# -le 1 ] || die "usage: publish.sh [--check] [--no-prepare] [--remote R] [--head-owner O] [<sandbox-remote>]"
+[ $# -le 1 ] || die "usage: github-publish [--check] [--no-prepare] [--remote R] [--head-owner O] [<sandbox-remote>]"
 [ $# -eq 0 ] || sandbox=$1
 
 plain() { case $1 in "" | -* | *..* | *[!A-Za-z0-9._/+-]*) return 1 ;; esac; return 0; }
@@ -168,7 +171,7 @@ recit() {
 fsha() { sha256sum <"$1" | cut -d' ' -f1; }
 
 if [ -z "$noprep" ]; then
-	out=$(sh "$here/prepare.sh" ${sandbox:+"$sandbox"} 2>&1 </dev/null)
+	out=$(sh "$libexec/prepare.sh" ${sandbox:+"$sandbox"} 2>&1 </dev/null)
 	rc=$?
 	printf '%s\n' "$out" | clean
 	[ "$rc" -eq 0 ] || exit 1
@@ -293,7 +296,7 @@ scan_branches() { # scan_branches <file> <request dir>
 		case " $prev " in *" $base "*) checkbase=refs/remotes/$sandbox/$base ;; esac
 		case $checkbase in refs/*) baseref=$checkbase ;; *) baseref=refs/remotes/$remote/$checkbase ;; esac
 		echo "-- branch $branch, base $base"
-		out=$(sh "$here/check-branch.sh" "$sandbox" "$branch" "$checkbase" "$remote" 2>&1 </dev/null)
+		out=$(sh "$libexec/check-branch.sh" "$sandbox" "$branch" "$checkbase" "$remote" 2>&1 </dev/null)
 		rc=$?
 		printf '%s\n' "$out" | clean
 		if [ "$rc" -ne 0 ]; then
@@ -308,7 +311,7 @@ scan_branches() { # scan_branches <file> <request dir>
 		sha=$(git rev-parse --verify -q "refs/remotes/$sandbox/$branch^{commit}") || {
 			reqskip "$d" "no fetched commit for $branch"; break
 		}
-		out=$(sh "$here/publish-branch.sh" ${owner:+--head-owner "$owner"} --remote "$remote" "$sandbox" "$f" "$branch" "$sha" 2>&1 </dev/null)
+		out=$(sh "$libexec/publish-branch.sh" ${owner:+--head-owner "$owner"} --remote "$remote" "$sandbox" "$f" "$branch" "$sha" 2>&1 </dev/null)
 		rc=$?
 		printf '%s\n' "$out" | sed '/^commands, if you have to run them yourself:/,$d' | clean
 		if [ "$rc" -ne 0 ]; then
@@ -449,7 +452,7 @@ lasturl() { printf '%s\n' "$1" | tail -n 1; }
 
 do_branch() {
 	it=$1
-	out=$(sh "$here/publish-branch.sh" --go ${owner:+--head-owner "$owner"} --remote "$remote" "$sandbox" "$(cat "$it/reqfile")" "$(cat "$it/Branch")" "$(cat "$it/sha")" 2>&1 </dev/null)
+	out=$(sh "$libexec/publish-branch.sh" --go ${owner:+--head-owner "$owner"} --remote "$remote" "$sandbox" "$(cat "$it/reqfile")" "$(cat "$it/Branch")" "$(cat "$it/sha")" 2>&1 </dev/null)
 	rc=$?
 	printf '%s\n' "$out" | clean
 	res=$(printf '%s\n' "$out" | sed -n 's/^result: \([a-z]*\).*/\1/p' | tail -n 1)
@@ -559,7 +562,7 @@ finish() { # finish <exit code>
 			cat "$d/mark" >>"$done"
 		done
 		echo "posted $posted of $total planned, failed $failed"
-		arch=$here/../../workflow-audit/scripts/archive.sh
+		arch=$HOME/.ai/skills/workflow-audit/scripts/archive.sh
 		if [ "$posted" -gt 0 ]; then
 			if [ -f "$arch" ]; then
 				echo "archiving the sandbox evidence"

@@ -2,8 +2,8 @@
 name: workflow-audit
 description: >
   Check that the agent workflow was followed: the rules in AGENTS.md and the
-  skills (milestone-snapshots, maker-checker, commit-curator, github-responder,
-  github-publisher). Reads the git and jj state of a repo and the Claude Code,
+  skills (milestone-snapshots, maker-checker, commit-curator, github-responder).
+  Reads the git and jj state of a repo and the Claude Code,
   Codex and Copilot CLI session transcripts, on the host or from a sandbox, and reports
   where a rule was broken or a skill was skipped. Use only when the user asks
   to audit, inspect or monitor the workflow or what the agents did. Read-only:
@@ -41,9 +41,9 @@ Transcripts. On the host, point `--cwd` at the repo. For a sandbox, copy its ses
     stage=$(mktemp -d); sbx cp <sandbox>:/home/agent/.claude/projects/<folder> "$stage/"
     sh ~/.ai/skills/workflow-audit/scripts/audit.sh transcripts --cwd <path in sandbox> [--since YYYY-MM-DD] [--include-active] "$stage"
 
-To keep the evidence of a sandbox, or to read it after the sandbox is gone, use the archive instead of copying by hand. From the repo on the host, `sh ~/.ai/skills/workflow-audit/scripts/archive.sh <sandbox>` copies the session transcripts, the maker-checker review files, the agent's memory notes and a repo mode report to `~/.local/state/agent-archive/<repo path with / as ->/<sandbox>-<id>/`, and prints only paths and counts. github-publisher runs it every time. Pass that folder's `claude` and `codex` subfolders to the transcripts mode, with `--cwd` set to the repo path. Archives older than 8 weeks are deleted. The archive is outside the repo on purpose, because a sandbox can read the host repo, ignored files included.
+To keep the evidence of a sandbox, or to read it after the sandbox is gone, use the archive instead of copying by hand. From the repo on the host, `sh ~/.ai/skills/workflow-audit/scripts/archive.sh <sandbox>` copies the session transcripts, the maker-checker review files, the agent's memory notes and a repo mode report to `~/.local/state/agent-archive/<repo path with / as ->/<sandbox>-<id>/`, and prints only paths and counts. `github-publish` runs it every time. Pass that folder's `claude` and `codex` subfolders to the transcripts mode, with `--cwd` set to the repo path. Archives older than 8 weeks are deleted. The archive is outside the repo on purpose, because a sandbox can read the host repo, ignored files included.
 
-Publishing. `publish.sh` of the github-publisher skill keeps a log of what it posted and what it left alone in `~/.local/state/github-publish/log.jsonl`, on the host and outside the repo, so a sandbox cannot read or change it. Read it with:
+Publishing. `github-publish` keeps a log of what it posted and what it left alone in `~/.local/state/github-publish/log.jsonl`, on the host and outside the repo, so a sandbox cannot read or change it. Read it with:
 
     sh ~/.ai/skills/workflow-audit/scripts/audit.sh publish [--cwd <repo path>] [--since YYYY-MM-DD] [--until YYYY-MM-DD]
 
@@ -65,13 +65,13 @@ Decide for each one: confirmed, explained (the user approved it in the prompt ju
 - `goal-missing`, `goal-not-empty`, `empty-snapshot`: a milestone chain without its empty `Goal: ` commit, a goal commit that holds changes, or a snapshot made with no changes. jj repos only.
 - `review-claimed` (FAIL): a `Review:` line names a round with no answer file. That is a claimed review that did not happen. `review-no-response`, `review-format` and `review-unverified` are weaker: no verdict recorded, a line the skills do not define, or review files not reachable from here.
 - `attribution` (FAIL): an AI attribution line in a commit or in a command. Check the harness too, since a default template can add it against AGENTS.md.
-- `unsigned`, `signature`, `no-message`: commits on branches meant for publishing. They matter only before github-publisher runs.
+- `unsigned`, `signature`, `no-message`: commits on branches meant for publishing. They matter only before `github-publish` runs.
 - `skill-skipped`: the prompt asked for a skill and the session shows no sign of it. Check that the user was not only talking about the skill.
 - `chat-mode`: a `chat:` prompt allows reading only. A file edit outside `/tmp` is a FAIL. A command that may change things is a WARN.
 - `signing-bypass`: signing turned off. Fine in a throwaway clone, a problem in the real repo.
-- `publish-partial` (FAIL): publish.sh pushed or created something and a later step failed. Look at the PR and the branch on GitHub. `publish-failed` is a post or a branch that did not go out, and nothing was written for the second kind. `publish-unfinished`: a run with no end, interrupted or crashed.
+- `publish-partial` (FAIL): `github-publish` pushed or created something and a later step failed. Look at the PR and the branch on GitHub. `publish-failed` is a post or a branch that did not go out, and nothing was written for the second kind. `publish-unfinished`: a run with no end, interrupted or crashed.
 - `publish-check-failed`: a draft branch failed the checks at publish time (signatures, messages, base, remote), which points at the commit-curator step. `publish-refused`: a request file with control characters or hidden direction marks, written by a sandbox agent, so look at how that draft came about. `publish-flagged` (INFO): a post that carried a flag (attribution line, @mention, secret-like text, other repo) and was approved one by one. Judge it by the record's approval, there is no prompt text to read.
-- `commit-approval`, `outbound-write`: a `git commit`, a push or a GitHub write. Judge by the prompt right before it: was the exact text shown and approved? In a Copilot session an approval given through its ask_user tool shows up as `approval: <choice>`. It is only INFO when the session used github-publisher.
+- `commit-approval`, `outbound-write`: a `git commit`, a push or a GitHub write. Judge by the prompt right before it: was the exact text shown and approved? In a Copilot session an approval given through its ask_user tool shows up as `approval: <choice>`. Sandbox work is published by `github-publish` in the user's own terminal, which leaves no session, so these always need the approval check.
 
 ## Report
 
@@ -79,9 +79,9 @@ Keep it short and plain. Start with what was covered, from the `checked:` line, 
 
 ## What it cannot see
 
-The publish log is the script's own account of what it did, not an independent witness, and it holds nothing about a write that an agent made itself. Those show up in the transcripts check as `outbound-write`. With publish.sh in use, such a write is outside the workflow, so treat it as a lead even when the session mentions github-publisher.
+The publish log is the script's own account of what it did, not an independent witness, and it holds nothing about a write that an agent made itself. Those show up in the transcripts check as `outbound-write`. With `github-publish` in use, publishing by an agent is outside the workflow, so treat such a write as a lead.
 
-The script cannot read intent, so approval is always your call. In chat mode it does not see shell redirects, `rm` or `cp`. It does not read text inside files that were written with Edit or Write. Commands that build a throwaway repo (`git init`, `git clone`, `mktemp`, `GIT_CONFIG_GLOBAL`) are not checked for commits and signing. The Codex and Copilot parsers are best effort. Codex was tried on a few small sessions. Copilot was tried on two github-publisher sessions that used only the bash, skill and ask_user tools, so its file edit tool names are a guess. If the user wants a deep audit of one skill, read that session against the steps in its SKILL.md yourself. The script covers only the cheap checks.
+The script cannot read intent, so approval is always your call. In chat mode it does not see shell redirects, `rm` or `cp`. It does not read text inside files that were written with Edit or Write. Commands that build a throwaway repo (`git init`, `git clone`, `mktemp`, `GIT_CONFIG_GLOBAL`) are not checked for commits and signing. The Codex and Copilot parsers are best effort. Codex was tried on a few small sessions. Copilot was tried on two publishing sessions that used only the bash, skill and ask_user tools, so its file edit tool names are a guess. If the user wants a deep audit of one skill, read that session against the steps in its SKILL.md yourself. The script covers only the cheap checks.
 
 ## Adding a check
 

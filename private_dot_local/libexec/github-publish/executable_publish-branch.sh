@@ -1,7 +1,7 @@
 #!/bin/sh
 # Pushes one branch of a "branches" request and opens its PR. The title and the
 # description are read from the request file by this script, so the text the user
-# approved is the text that is posted, and the agent never retypes it.
+# approved is the text that is posted, and nothing is retyped.
 #
 #   publish-branch.sh [--go] [--remote <remote>] [--head-owner <owner>] \
 #                     <sandbox-remote> <request-file> <branch> <sha>
@@ -22,7 +22,7 @@
 #   4. appends the lines to .ai/github-publisher/log.md.
 # It never merges, closes, labels or resolves anything.
 #
-# The request file is the one of the skill: a header of "Key: value" lines, then
+# The request file is the one of ~/.ai/github-requests.md: a header of "Key: value" lines, then
 # one item per branch after a "---" line. A "---" line ends an item only when the
 # next line is a "Key: value" line, so a rule inside a description is kept.
 #
@@ -189,7 +189,7 @@ fi
 ghok=
 if command -v gh >/dev/null 2>&1 && gh auth status >/dev/null 2>&1; then ghok=1; fi
 if [ -z "$ghok" ]; then
-	if [ -n "$go" ]; then stop "gh is not installed or not logged in, nothing was pushed. See When GitHub auth fails in the skill"; fi
+	if [ -n "$go" ]; then stop "gh is not installed or not logged in, nothing was pushed. Log in with gh and run it again"; fi
 	echo "WARN gh is not usable here, so the open-PR check was skipped"
 elif [ -z "$prn" ]; then
 	if open=$(gh pr list --repo "$repo" --head "$branch" --state open --json number --jq 'map(.number)|join(",")' 2>/dev/null); then
