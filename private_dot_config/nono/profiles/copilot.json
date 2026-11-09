@@ -6,10 +6,26 @@
   },
   "filesystem": {
     "allow": [
-      "$HOME/.copilot"
+      "$HOME/.copilot",
+      "$HOME/.local/state/agent-archive"
+    ],
+    "read": [
+      "$HOME/knowledge",
+      "$HOME/.config/sandboxes/sandboxes/locks",
+      "$HOME/.config/sandboxes/sandboxes/auth-cooldown",
+      "$HOME/.config/sandboxes/sandboxes/auth-ambiguous-refresh"
+    ],
+    "read_file": [
+      "$HOME/.config/sandboxes/sandboxes/settings.json.lock"
+    ],
+    "unix_socket": [
+      "$HOME/.local/state/sandboxes/sandboxes/sandboxd/sandboxd.sock"
     ]
   },
   "network": {
+    "open_port_range": [
+      [32768, 60999]
+    ],
     "allow_domain": [
       "api.githubcopilot.com",
       "*.githubcopilot.com",
