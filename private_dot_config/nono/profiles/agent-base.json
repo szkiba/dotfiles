@@ -23,12 +23,20 @@
       "$HOME/.config/git",
       "$HOME/.config/jj",
       "$HOME/.local/wrappers",
+      "$HOME/.ssh/key-tpm-*.pub",
       "/hub/all"
+    ],
+    "bypass_protection": [
+      "$HOME/.ssh/key-tpm-*.pub"
     ],
     "read_file": [
       "$HOME/.gitconfig-machine",
       "$HOME/.config/gh/config.yml",
       "$HOME/.config/gh/hosts.yml"
+    ],
+    "unix_socket": [
+      "$XDG_RUNTIME_DIR/gcr/ssh",
+      "$XDG_RUNTIME_DIR/ssh-tpm-agent.sock"
     ]
   },
   "network": {
