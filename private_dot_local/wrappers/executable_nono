@@ -1,8 +1,13 @@
 #!/usr/bin/env bash
-# Pass --allow-cwd to nono run, shell and wrap when they are typed in a
-# terminal, so the working directory is shared without the prompt. The access
-# level still comes from the profile (workdir.access). Put this folder first
-# in PATH.
+# Two conveniences on top of nono. Put this folder first in PATH.
+#
+#   nono claude|codex|copilot [agent args]
+#     Run that agent in the nono profile of the same name. Everything after
+#     the agent name goes to the agent. For extra nono flags use the long form,
+#     nono run --profile <name> <flags> -- <agent>.
+#
+#   nono run|shell|wrap ...
+#     Pass --allow-cwd so the working directory is shared without the prompt.
 
 # Drop this folder from PATH, or `exec nono` would find this wrapper again and
 # loop.
@@ -10,16 +15,55 @@ self=$(cd "${0%/*}" && pwd)
 p=":$PATH:"; p=${p//":$self:"/:}; p=${p#:}
 PATH=${p%:}
 
-# Without a terminal (scripts, agents, CI) keep nono's own rule: it wants an
-# explicit --allow-cwd there.
+# --allow-cwd only in a terminal. Without one (scripts, agents, CI) keep nono's
+# own rule: it wants an explicit --allow-cwd there. The access level still
+# comes from the profile (workdir.access).
+cwd=()
 if [ -t 0 ] && [ -t 1 ]; then
-  case $1 in
-    run|shell|wrap)
-      sub=$1
-      shift
-      exec nono "$sub" --allow-cwd "$@"
-      ;;
-  esac
+  cwd=(--allow-cwd)
+  # nono rejects the flag twice, so leave it out if it was typed already.
+  for a in "$@"; do
+    [ "$a" = -- ] && break
+    [ "$a" = --allow-cwd ] && cwd=()
+  done
 fi
+
+case $1 in
+  claude|codex|copilot)
+    agent=$1
+    shift
+    # A sandbox cannot start inside another one.
+    if [ -n "${NONO_CAP_FILE:-}" ]; then
+      echo "nono: already inside a nono sandbox, run $agent directly" >&2
+      exit 1
+    fi
+    # Codex has its own sandbox, which clashes with nono's, so turn it off and
+    # let nono be the boundary. --no-daemon keeps codex from using the shared
+    # background server, which runs outside nono. Approvals stay on. Codex
+    # rejects a repeated flag, so each default is added only if it was not
+    # given.
+    if [ "$agent" = codex ]; then
+      have_daemon= have_sandbox= have_approval=
+      for a in "$@"; do
+        case $a in
+          --no-daemon) have_daemon=1 ;;
+          -s|--sandbox|--sandbox=*) have_sandbox=1 ;;
+          -a|--ask-for-approval|--ask-for-approval=*) have_approval=1 ;;
+        esac
+      done
+      defaults=()
+      [ -n "$have_daemon" ] || defaults+=(--no-daemon)
+      [ -n "$have_sandbox" ] || defaults+=(--sandbox danger-full-access)
+      [ -n "$have_approval" ] || defaults+=(--ask-for-approval on-request)
+      set -- "${defaults[@]}" "$@"
+    fi
+    exec nono run "${cwd[@]}" --profile "$agent" -- "$agent" "$@"
+    ;;
+  run|shell|wrap)
+    sub=$1
+    shift
+    exec nono "$sub" "${cwd[@]}" "$@"
+    ;;
+esac
 
 exec nono "$@"
