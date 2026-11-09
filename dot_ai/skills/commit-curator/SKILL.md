@@ -32,7 +32,7 @@ Group the changes into commits. Each commit is one logical change and should bui
 
 If the user wants stacked branches, also group the commits into layers. A layer is a size a reviewer can take in one PR, and each layer should stand on its own. Name the branches by the repo's convention, or `<topic>-<n>-<slug>`. The tip of each branch is the last commit of its layer, so each branch contains the one before it. The first one is based on the default branch. A single series gets one branch name.
 
-Print the plan as normal text before changing anything, one block per commit with its complete, exact message and its files, and for each layer its branch name and base. Write the messages by the commit message rules in AGENTS.md. A `Refs:` line goes into a commit message only when reviewers can open the target, such as an issue or a file committed in the repo, never when it points into `.ai/`. Never copy a `Review:` line into a commit message. Then ask a short question on how to approve, without repeating the plan, offering all at once, one by one, or edit first, and propose the scope as AGENTS.md says.
+Print the plan as normal text before changing anything, one block per commit with its complete, exact message and no list of files, and for each layer its branch name and base. Write the messages by the commit message rules in AGENTS.md. A `Refs:` line goes into a commit message only when reviewers can open the target, such as an issue or a file committed in the repo, never when it points into `.ai/`. Never copy a `Review:` line into a commit message. Then ask a short question on how to approve, without repeating the plan, offering all at once, one by one, or edit first, and propose the scope as AGENTS.md says.
 
 ## Build in jj
 
@@ -68,6 +68,10 @@ Then check `git log --format='%h %G? %an <%ae> %s' snap/<topic>..HEAD`. Every li
 
 If signing fails, jj changes nothing. Tell the user what it said and stop. Do not skip or bypass signing on your own. If the user then tells you to skip it, leave the commits unsigned and say so in the report.
 
+## Publish request
+
+After signing, write the `github-publish` request for the branches you made, even for a single one and even if the user has not talked about publishing yet. The file is `.ai/github-publisher/<snap topic>-branches-1.md`, in the format of `~/.ai/github-requests.md`, with one item per branch in stack order. The title and description are final, because `github-publish` posts them word for word. Write them by the PR rules in AGENTS.md and print them in full in your report.
+
 ## If it goes wrong
 
 Curation never rewrites the milestone snapshots. It only adds new commits, and the later steps rewrite only those. The snapshots stay in the repo under `snap/<topic>` and `snap/<topic>-raw`, so a failed or rejected attempt can be redone. Run `jj op restore <operation id>` to drop the curated commits and start again at step 2. `jj op log` lists the operations if the id is lost. Never abandon or rebase the commits in `snap/<topic>..snap/<topic>-raw`.
@@ -81,4 +85,4 @@ Say what exists now in a few lines: the commits with their hashes, subjects and 
 
 Do not delete either unasked.
 
-For the branches you created, also write a request for `github-publish`, so the user can publish them from the host: `.ai/github-publisher/<snap topic>-branches-1.md`, in the format of `~/.ai/github-requests.md`. Use one item per branch in stack order, with its base, a proposed PR title and a short description written by the PR rules in AGENTS.md. Check `git check-ignore -q .ai` first. Pushing and opening PRs stay with the user. End your report with one plain line for the next step: run `github-publish` in your own terminal on the host, which shows the exact PR text and asks for the approval. Say if anything still waits for the user here, and if nothing does, say so.
+End your report with one plain line for the next step: run `github-publish` in your own terminal on the host, which shows the exact PR text and asks for the approval. Say if anything still waits for the user here, and if nothing does, say so.
