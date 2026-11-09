@@ -1,0 +1,675 @@
+#!/bin/sh
+# The github-publisher skill as one script, for you to run in your own terminal.
+# No agent is involved: you read the exact texts and answer the prompts.
+#
+#   publish.sh [--check] [--no-prepare] [--remote <remote>] [--head-owner <owner>] [<sandbox-remote>]
+#
+# Run it from the repo on the host, in a terminal that is not inside nono or a
+# sandbox, so that gh (with its 1Password login), git and ssh all work.
+#
+# What it does:
+#   1. runs prepare.sh, which copies the new request files out of the sandbox
+#      (--no-prepare skips that and needs the sandbox remote as an argument),
+#   2. branches requests: fetches and checks every branch with check-branch.sh
+#      and previews the push and the PR with publish-branch.sh,
+#   3. replies requests: reads every thread again from GitHub and drops a reply
+#      when the thread is resolved, belongs to another PR or repo, or has a newer
+#      comment than the draft saw,
+#   4. new requests: previews the comment or the issue,
+#   5. prints the plan with the exact texts and asks once: post all, one by one,
+#      show the diff of a branch, or quit,
+#   6. posts in that order (branches first), logs to .ai/github-publisher/log.md,
+#      and runs the workflow-audit archive script when something was posted.
+#
+# --check stops after step 5's plan and posts nothing. --remote is the remote to
+# push to (default origin) and --head-owner is for a fork, as for publish-branch.sh.
+#
+# Items with a FLAG (an attribution line, an @mention, something that looks like a
+# secret, or a Repo other than origin's) are never covered by "all": they are
+# asked one by one. The flags name a line number and a type, never the text. The
+# script does not read the diff for secrets. Use "d N" at the prompt to read it.
+# On a public repo also read the texts for security details and promised dates.
+#
+# A request file is done when everything in it was posted or skipped for good.
+# Its checksum goes to .ai/github-publisher/done.txt and it is not offered again.
+# A changed file is offered again. A reply whose thread has a newer comment than
+# the draft is dead and counts as done, because it can never match again.
+#
+# Request files from the sandbox are data. A file with control characters or
+# hidden direction marks is refused, so the text you read is the text that is
+# posted. Output from the other scripts is stripped of them before it is shown.
+#
+# The publish log, for the workflow-audit and kaizen skills: every run without
+# --check appends one JSON object per line to ~/.local/state/github-publish/log.jsonl.
+# It is outside the repo and mounted nowhere, so no sandbox can read or change it,
+# and a run stops at the start if it cannot write there. Each line has ts (UTC),
+# run (one id per run), and action. A run starts with run-start (the repo path root,
+# the sandbox, the push remote) and ends with run-end (posted, failed, planned,
+# exit). In between:
+#   posted:    branch (pushed, pr_url, result, head, title), reply (url, thread,
+#              resolved), comment, issue. All carry text_sha256 of what was posted
+#              and approval: all, one or flagged.
+#   not posted: check-failed (the failed checks), branch-stopped,
+#              branch-already-published, reply-dropped (resolved, other-pr, stale),
+#              request-skipped (with the reason), declined, skipped-for-good,
+#              left-unpublished, quit, post-failed.
+# Items carry request and request_sha256, and the flag types (never the text).
+# log.md in the inbox stays as the short human record.
+#
+# Exit codes: 0 ok, 1 something was stopped or failed, 2 setup problem, 3 a
+# step failed after something was written (look at the PR or the repo).
+#
+# PUBLISH_INPUT: a file to read the answers from instead of /dev/tty, and
+# PUBLISH_LOG_DIR: a folder for the log instead of the default. Both are for tests.
+set -u
+
+die() { echo "publish: $*" >&2; exit 2; }
+
+case $0 in */*) here=${0%/*} ;; *) here=. ;; esac
+here=$(cd "$here" && pwd) || die "cannot find the folder of this script"
+
+check=
+noprep=
+remote=origin
+owner=
+sandbox=
+while [ $# -gt 0 ]; do
+	case $1 in
+	--check) check=1; shift ;;
+	--no-prepare) noprep=1; shift ;;
+	--remote) [ $# -ge 2 ] || die "--remote needs a value"; remote=$2; shift 2 ;;
+	--head-owner) [ $# -ge 2 ] || die "--head-owner needs a value"; owner=$2; shift 2 ;;
+	-*) die "unknown option $1" ;;
+	*) break ;;
+	esac
+done
+[ $# -le 1 ] || die "usage: publish.sh [--check] [--no-prepare] [--remote R] [--head-owner O] [<sandbox-remote>]"
+[ $# -eq 0 ] || sandbox=$1
+
+plain() { case $1 in "" | -* | *..* | *[!A-Za-z0-9._/+-]*) return 1 ;; esac; return 0; }
+okrepo() { case $1 in "" | */*/* | /* | */ | -* | *[!A-Za-z0-9._/-]*) return 1 ;; */*) return 0 ;; esac; return 1; }
+digits() { case $1 in "" | *[!0-9]*) return 1 ;; esac; return 0; }
+lower() { printf %s "$1" | tr 'A-Z' 'a-z'; }
+plain "$remote" || die "not a plain remote name: $remote"
+case $owner in -* | *[!A-Za-z0-9._-]*) die "not a plain owner name: $owner" ;; esac
+{ [ -z "$sandbox" ] || plain "$sandbox"; } || die "not a plain remote name: $sandbox"
+
+# Strip control characters, hidden direction marks and C1 codes before showing
+# text that came from a sandbox.
+clean() {
+	LC_ALL=C tr -d '\000-\010\013-\037\177' |
+		LC_ALL=C sed 's/\xc2[\x80-\x9f]//g; s/\xe2\x80[\xaa-\xae]//g; s/\xe2\x81[\xa6-\xa9]//g'
+}
+# True when a file has such characters (a tab and a newline are fine).
+unsafe() {
+	[ "$(LC_ALL=C tr -d '\011\012' <"$1" | LC_ALL=C tr -cd '\000-\037\177' | wc -c)" -gt 0 ] && return 0
+	[ -n "$(LC_ALL=C sed -n '/\xc2[\x80-\x9f]\|\xe2\x80[\xaa-\xae]\|\xe2\x81[\xa6-\xa9]/p' "$1")" ]
+}
+
+root=$(git rev-parse --show-toplevel 2>/dev/null) || die "run it from the repo"
+cd "$root" || die "cannot enter $root"
+command -v gh >/dev/null 2>&1 || die "gh is not installed"
+command -v jq >/dev/null 2>&1 || die "jq is not installed"
+command -v sha256sum >/dev/null 2>&1 || die "sha256sum is not installed"
+
+tmp=$(mktemp -d) || die "cannot make a temp folder"
+case $tmp in *[!A-Za-z0-9._/-]*) rm -rf "$tmp"; die "the temp folder has unusual characters: $tmp" ;; esac
+trap 'rm -rf "$tmp"' EXIT
+trap 'exit 130' HUP INT TERM
+
+# Answers come from a persistent descriptor, so a test file is read line by line.
+tty=${PUBLISH_INPUT:-/dev/tty}
+if [ -z "$check" ]; then
+	{ true <"$tty"; } 2>/dev/null || die "no terminal to ask for approval, run it in your own terminal"
+	exec 4<"$tty"
+fi
+
+# The publish log: one JSON line per event, for the audit and kaizen skills. It
+# lives outside the repo, so a sandbox cannot read or change it. Without --check a
+# log that cannot be written stops the run before anything is posted. After that a
+# failed write only warns, so a post that happened is never hidden by it.
+logf=
+runid=
+if [ -z "$check" ]; then
+	logdir=${PUBLISH_LOG_DIR:-$HOME/.local/state/github-publish}
+	(umask 077; mkdir -p "$logdir" && true >>"$logdir/log.jsonl") 2>/dev/null || die "cannot write the publish log in $logdir"
+	logf=$logdir/log.jsonl
+	runid=$(date -u +%Y%m%dT%H%M%SZ)-$$
+fi
+# JSON array of the non-empty lines on stdin.
+jarr() { jq -Rn '[inputs | select(. != "")]'; }
+# rec <action> [jq --arg/--argjson pairs]: append one event.
+rec() {
+	[ -n "$logf" ] || return 0
+	ev=$1
+	shift
+	line=$(jq -cn --arg ts "$(date -u +%Y-%m-%dT%H:%M:%SZ)" --arg run "$runid" --arg action "$ev" "$@" '$ARGS.named') || { echo "WARN: could not format a log record"; return 0; }
+	printf '%s\n' "$line" >>"$logf" || echo "WARN: could not write the publish log $logf"
+	return 0
+}
+# recreq <action> <request dir> [pairs]: an event about a request file.
+recreq() {
+	ev=$1
+	rd=$2
+	shift 2
+	read -r rh rn <"$rd/mark"
+	rec "$ev" --arg request "$rn" --arg request_sha256 "$rh" "$@"
+}
+# recit <action> <item dir> [pairs]: an event about an item, with its flag types.
+recit() {
+	ev=$1
+	ri=$2
+	shift 2
+	rft=
+	[ ! -f "$ri/flagtypes" ] || rft=$(cat "$ri/flagtypes")
+	rfj=$(printf '%s\n' "$rft" | tr , '\n' | jarr)
+	recreq "$ev" "${ri%/*}" --argjson flags "$rfj" "$@"
+}
+fsha() { sha256sum <"$1" | cut -d' ' -f1; }
+
+if [ -z "$noprep" ]; then
+	out=$(sh "$here/prepare.sh" ${sandbox:+"$sandbox"} 2>&1 </dev/null)
+	rc=$?
+	printf '%s\n' "$out" | clean
+	[ "$rc" -eq 0 ] || exit 1
+	sandbox=$(printf '%s\n' "$out" | sed -n 's/^sandbox: .* (remote \(.*\))$/\1/p' | head -n 1)
+	plain "$sandbox" || die "could not read the sandbox remote from the setup output"
+else
+	[ -n "$sandbox" ] || die "--no-prepare needs the sandbox remote"
+	git remote get-url "$sandbox" >/dev/null 2>&1 || die "no remote named $sandbox"
+	git check-ignore -q .ai/github-publisher/probe.md || die ".ai is not ignored by git, so request files could be committed"
+fi
+gh auth status >/dev/null 2>&1 || die "gh is not logged in. Log in, then run this again"
+
+inbox=$root/.ai/github-publisher
+[ -d "$inbox" ] || die "no $inbox"
+done=$inbox/done.txt
+ourl=$(git remote get-url origin 2>/dev/null) || ourl=
+orepo=
+case $ourl in
+*github.com[:/]*) orepo=$(printf %s "$ourl" | sed -E 's#^.*github\.com[:/]##; s#\.git$##') ;;
+esac
+rec run-start --arg root "$root" --arg sandbox "${sandbox#sandbox-}" --arg push_remote "$remote" --arg origin_repo "$orepo"
+
+# Parser for a request file. mode=items: a header of Key: value lines, then one
+# item after each "---" line that is followed by a Key: value line. mode=single:
+# a header, an optional "---", then the text. It writes header/<Key>, and for each
+# item <NNN>/<Key> and <NNN>/body, below dir.
+AWK='
+function trim(s) { sub(/^[ \t]+/, "", s); sub(/[ \t\r]+$/, "", s); return s }
+function isrule(s) { return s ~ /^---[ \t\r]*$/ }
+function isblank(s) { return s ~ /^[ \t\r]*$/ }
+function iskey(s) { return s ~ /^[A-Za-z][A-Za-z0-9_-]*:([ \t]|$)/ }
+function kname(s) { sub(/:.*/, "", s); return s }
+function kval(s) { sub(/^[^:]*:/, "", s); return trim(s) }
+function put(f, v) { printf "%s\n", v > f; close(f) }
+function mk(d) { system("mkdir -p \"" d "\"") }
+function body(f, from, tn,    j) {
+	while (tn >= from && T[tn] ~ /^[ \t]*$/) tn--
+	printf "" > f
+	for (j = from; j <= tn; j++) print T[j] >> f
+	close(f)
+}
+{ L[++n] = $0 }
+END {
+	hd = dir "/header"; mk(hd)
+	i = 1
+	if (mode == "single") {
+		while (i <= n && !isblank(L[i]) && !isrule(L[i])) { if (iskey(L[i])) put(hd "/" kname(L[i]), kval(L[i])); i++ }
+		while (i <= n && isblank(L[i])) i++
+		if (i <= n && isrule(L[i])) { i++; while (i <= n && isblank(L[i])) i++ }
+		tn = 0
+		while (i <= n) { tn++; T[tn] = L[i]; sub(/\r$/, "", T[tn]); i++ }
+		idir = dir "/001"; mk(idir)
+		body(idir "/body", 1, tn)
+		exit
+	}
+	while (i <= n && !isrule(L[i])) { if (iskey(L[i])) put(hd "/" kname(L[i]), kval(L[i])); i++ }
+	while (i <= n) {
+		i++
+		idir = sprintf("%s/%03d", dir, ++idx); mk(idir)
+		while (i <= n && !isrule(L[i]) && !isblank(L[i])) { if (iskey(L[i])) put(idir "/" kname(L[i]), kval(L[i])); i++ }
+		while (i <= n && isblank(L[i])) i++
+		tn = 0
+		while (i <= n && !(isrule(L[i]) && (i == n || iskey(L[i + 1])))) { tn++; T[tn] = L[i]; sub(/\r$/, "", T[tn]); i++ }
+		body(idir "/body", 1, tn)
+	}
+}'
+
+# FLAG lines for a text file: a line number and a type, never the text itself.
+flags() {
+	[ -s "$1" ] || return 0
+	grep -n -i -E 'co-authored-by|generated with' "$1" | cut -d: -f1 |
+		while read -r ln; do echo "FLAG attribution line at line $ln"; done
+	grep -n -E '(^|[^A-Za-z0-9_./-])@[A-Za-z0-9]' "$1" | cut -d: -f1 |
+		while read -r ln; do echo "FLAG @mention at line $ln"; done
+	grep -n -i -E 'gh[pousr]_[A-Za-z0-9]{30,}|github_pat_[A-Za-z0-9_]{20,}|AKIA[0-9A-Z]{16}|xox[abprs]-[A-Za-z0-9-]{10,}|-----BEGIN [A-Z ]*PRIVATE KEY-----|sk-[A-Za-z0-9]{20,}|(password|passwd|secret|token|api[_-]?key)[[:space:]]*[=:][[:space:]]*[^[:space:]]{8,}|://[^/[:space:]@]+:[^/[:space:]@]+@' "$1" | cut -d: -f1 |
+		while read -r ln; do echo "FLAG looks like a secret at line $ln"; done
+	return 0
+}
+repoflag() {
+	[ -n "$orepo" ] && [ "$(lower "$1")" != "$(lower "$orepo")" ] && echo "FLAG repo: the request is for $1 but origin is $orepo"
+	return 0
+}
+# Show the flags of an item and keep them in its folder.
+flagit() { # flagit <item dir> <repo> <text file>
+	fl=$(
+		repoflag "$2"
+		flags "$3"
+	)
+	[ -z "$fl" ] || {
+		printf '%s\n' "$fl"
+		printf '%s\n' "$fl" >"$1/flag"
+		# Only the types go to the log, never a line or its text.
+		printf '%s\n' "$fl" | sed -n 's/^FLAG attribution.*/attribution/p; s/^FLAG @mention.*/mention/p; s/^FLAG looks like a secret.*/secret/p; s/^FLAG repo:.*/repo/p' | sort -u | paste -sd, - >"$1/flagtypes"
+	}
+}
+# A request or item that is left alone, with the reason. Keeps the file pending.
+reqskip() { # reqskip <request dir> <reason>
+	echo "SKIP: $2"
+	recreq request-skipped "$1" --arg reason "$2"
+	: >"$1/notdone"
+}
+
+plan=$tmp/plan
+: >"$plan"
+seq=0
+
+scan_branches() { # scan_branches <file> <request dir>
+	f=$1
+	d=$2
+	awk -v mode=items -v dir="$d" "$AWK" "$f" || { reqskip "$d" "could not read the file"; return; }
+	repo=$(cat "$d/header/Repo" 2>/dev/null)
+	okrepo "$repo" || { reqskip "$d" "the Repo line is missing or odd"; return; }
+	prev=
+	for it in "$d"/[0-9][0-9][0-9]; do
+		[ -d "$it" ] || continue
+		branch=$(cat "$it/Branch" 2>/dev/null)
+		base=$(cat "$it/Base" 2>/dev/null)
+		if ! { plain "$branch" && plain "$base"; }; then
+			reqskip "$d" "an item has no usable Branch or Base"; break
+		fi
+		checkbase=$base
+		case " $prev " in *" $base "*) checkbase=refs/remotes/$sandbox/$base ;; esac
+		case $checkbase in refs/*) baseref=$checkbase ;; *) baseref=refs/remotes/$remote/$checkbase ;; esac
+		echo "-- branch $branch, base $base"
+		out=$(sh "$here/check-branch.sh" "$sandbox" "$branch" "$checkbase" "$remote" 2>&1 </dev/null)
+		rc=$?
+		printf '%s\n' "$out" | clean
+		if [ "$rc" -ne 0 ]; then
+			echo "SKIP: the check did not pass, so this branch and the ones stacked on it are left"
+			# The names of the failed checks (signatures, messages, base, remote), or the
+			# last line when the script could not run at all.
+			cj=$(printf '%s\n' "$out" | sed -n 's/^FAIL \([A-Za-z]*\):.*/\1/p' | jarr)
+			recit check-failed "$it" --arg repo "$repo" --arg branch "$branch" --arg base "$base" --argjson rc "$rc" --argjson checks "$cj" \
+				--arg detail "$(printf '%s\n' "$out" | tail -n 1 | clean | cut -c1-200)"
+			: >"$d/notdone"; break
+		fi
+		sha=$(git rev-parse --verify -q "refs/remotes/$sandbox/$branch^{commit}") || {
+			reqskip "$d" "no fetched commit for $branch"; break
+		}
+		out=$(sh "$here/publish-branch.sh" ${owner:+--head-owner "$owner"} --remote "$remote" "$sandbox" "$f" "$branch" "$sha" 2>&1 </dev/null)
+		rc=$?
+		printf '%s\n' "$out" | sed '/^commands, if you have to run them yourself:/,$d' | clean
+		if [ "$rc" -ne 0 ]; then
+			stopwhy=$(printf '%s\n' "$out" | sed -n 's/^result: stop (\(.*\))$/\1/p' | tail -n 1 | clean | cut -c1-200)
+			case $out in
+			*"an open PR already exists"*)
+				recit branch-already-published "$it" --arg repo "$repo" --arg branch "$branch" --arg reason "$stopwhy"
+				prev="$prev $branch"; continue ;;
+			esac
+			echo "SKIP: this branch and the ones stacked on it are left"
+			recit branch-stopped "$it" --arg repo "$repo" --arg branch "$branch" --argjson rc "$rc" --arg reason "$stopwhy"
+			: >"$d/notdone"; break
+		fi
+		printf '%s\n' "$repo" >"$it/repo"
+		printf '%s\n' "$f" >"$it/reqfile"
+		printf '%s\n' "$sha" >"$it/sha"
+		printf '%s\n' "$baseref" >"$it/baseref"
+		flagit "$it" "$repo" "$it/body"
+		: >"$it/planned"
+		echo "branch $it" >>"$plan"
+		prev="$prev $branch"
+	done
+}
+
+scan_replies() {
+	f=$1
+	d=$2
+	awk -v mode=items -v dir="$d" "$AWK" "$f" || { reqskip "$d" "could not read the file"; return; }
+	repo=$(cat "$d/header/Repo" 2>/dev/null)
+	target=$(cat "$d/header/Target" 2>/dev/null)
+	okrepo "$repo" || { reqskip "$d" "the Repo line is missing or odd"; return; }
+	n=${target#pr }
+	case $target in "pr "*) digits "$n" ;; *) false ;; esac || { reqskip "$d" "Target must be pr <number>"; return; }
+	for it in "$d"/[0-9][0-9][0-9]; do
+		[ -d "$it" ] || continue
+		thread=$(cat "$it/Thread" 2>/dev/null)
+		comment=$(cat "$it/Comment" 2>/dev/null)
+		last=$(cat "$it/Last" 2>/dev/null)
+		verdict=$(cat "$it/Verdict" 2>/dev/null)
+		resolve=$(cat "$it/Resolve" 2>/dev/null)
+		case $thread in "" | *[!A-Za-z0-9_=-]*) reqskip "$d" "an item has no usable Thread"; continue ;; esac
+		{ digits "$comment" && digits "$last"; } || { reqskip "$d" "$thread: Comment and Last must be numbers"; continue; }
+		case $resolve in "" | no) resolve=no ;; yes) ;; *) reqskip "$d" "$thread: Resolve must be yes or no"; continue ;; esac
+		[ -s "$it/body" ] || { reqskip "$d" "$thread: the item has no text"; continue; }
+		tsv=$(gh api graphql -f id="$thread" -f query='query($id:ID!){node(id:$id){... on PullRequestReviewThread{isResolved pullRequest{number repository{nameWithOwner}} comments(last:1){nodes{databaseId}}}}}' --jq '.data.node | [.isResolved, .pullRequest.number, .pullRequest.repository.nameWithOwner, .comments.nodes[0].databaseId] | @tsv' 2>/dev/null </dev/null) || {
+			reqskip "$d" "$thread: could not read the thread from GitHub"; continue
+		}
+		IFS='	' read -r tres tpr tnwo tnew <<EOF
+$tsv
+EOF
+		if [ "$tres" != false ]; then
+			echo "DROP $thread: the thread is resolved or does not exist, the draft is dead"
+			recit reply-dropped "$it" --arg repo "$repo" --arg thread "$thread" --arg reason resolved; continue
+		fi
+		if [ "$tpr" != "$n" ] || [ "$(lower "$tnwo")" != "$(lower "$repo")" ]; then
+			echo "DROP $thread: it belongs to $tnwo#$tpr, not $repo#$n"
+			recit reply-dropped "$it" --arg repo "$repo" --arg thread "$thread" --arg reason other-pr; continue
+		fi
+		if [ "$tnew" != "$last" ]; then
+			echo "DROP $thread: it has a newer comment ($tnew) than the draft saw ($last), so the draft is out of date"
+			recit reply-dropped "$it" --arg repo "$repo" --arg thread "$thread" --arg reason stale; continue
+		fi
+		echo "-- reply on PR $n, thread $thread, verdict: ${verdict:-none}, resolve: $resolve"
+		cat "$it/body"
+		printf '%s\n' "$repo" >"$it/repo"
+		printf '%s\n' "$n" >"$it/prn"
+		flagit "$it" "$repo" "$it/body"
+		: >"$it/planned"
+		echo "reply $it" >>"$plan"
+	done
+}
+
+scan_new() {
+	f=$1
+	d=$2
+	awk -v mode=single -v dir="$d" "$AWK" "$f" || { reqskip "$d" "could not read the file"; return; }
+	it=$d/001
+	repo=$(cat "$d/header/Repo" 2>/dev/null)
+	target=$(cat "$d/header/Target" 2>/dev/null)
+	title=$(cat "$d/header/Title" 2>/dev/null)
+	okrepo "$repo" || { reqskip "$d" "the Repo line is missing or odd"; return; }
+	case $target in
+	"pr "* | "issue "*) digits "${target#* }" || target= ;;
+	"new issue") [ -n "$title" ] || target= ;;
+	*) target= ;;
+	esac
+	[ -n "$target" ] || { reqskip "$d" "Target must be pr <n>, issue <n> or new issue (with a Title)"; return; }
+	[ -s "$it/body" ] || { reqskip "$d" "the file has no text"; return; }
+	printf '%s\n' "$repo" >"$it/repo"
+	printf '%s\n' "$target" >"$it/target"
+	printf '%s\n' "$title" >"$it/Title"
+	if [ "$target" = "new issue" ]; then echo "-- new issue in $repo: $title"; else echo "-- comment on $target in $repo"; fi
+	cat "$it/body"
+	flagit "$it" "$repo" "$it/body"
+	: >"$it/planned"
+	echo "new $it" >>"$plan"
+}
+
+scan() { # scan <kind>
+	for f in "$inbox"/*-"$1"-[0-9]*.md; do
+		{ [ -f "$f" ] && [ ! -L "$f" ]; } || continue
+		b=${f##*/}
+		case $b in *[!A-Za-z0-9._-]*) continue ;; esac
+		h=$(sha256sum <"$f" | cut -d' ' -f1)
+		if [ -f "$done" ] && grep -q -F -x "$h $b" "$done"; then continue; fi
+		seq=$((seq + 1))
+		d=$tmp/req/$seq
+		mkdir -p "$d"
+		printf '%s\n' "$h $b" >"$d/mark"
+		echo "== $b"
+		if [ "$(wc -c <"$f")" -gt 262144 ]; then reqskip "$d" "the file is over 256 KB"; continue; fi
+		if unsafe "$f"; then
+			reqskip "$d" "the file has control characters or hidden direction marks, so what you read might not be what is posted"
+			continue
+		fi
+		"scan_$1" "$f" "$d"
+	done
+}
+
+label() { # label <kind> <item dir>
+	case $1 in
+	branch)
+		p=$(cat "$2/PR" 2>/dev/null)
+		if [ -n "$p" ]; then echo "push $(cat "$2/Branch") to the existing PR #$p"
+		else echo "push $(cat "$2/Branch") and open a PR: $(cat "$2/Title")"; fi ;;
+	reply)
+		r=
+		[ "$(cat "$2/Resolve" 2>/dev/null)" != yes ] || r=", then resolve it"
+		echo "reply on PR $(cat "$2/prn"), thread $(cat "$2/Thread")$r" ;;
+	new)
+		tg=$(cat "$2/target")
+		if [ "$tg" = "new issue" ]; then echo "new issue: $(cat "$2/Title")"; else echo "comment on $tg"; fi ;;
+	esac
+}
+
+log() { printf '%s %s\n' "$(date +%F)" "$1" >>"$inbox/log.md"; }
+lasturl() { printf '%s\n' "$1" | tail -n 1; }
+
+do_branch() {
+	it=$1
+	out=$(sh "$here/publish-branch.sh" --go ${owner:+--head-owner "$owner"} --remote "$remote" "$sandbox" "$(cat "$it/reqfile")" "$(cat "$it/Branch")" "$(cat "$it/sha")" 2>&1 </dev/null)
+	rc=$?
+	printf '%s\n' "$out" | clean
+	res=$(printf '%s\n' "$out" | sed -n 's/^result: \([a-z]*\).*/\1/p' | tail -n 1)
+	pj=false
+	printf '%s\n' "$out" | grep -q '^pushed: ' && pj=true
+	prurl=$(printf '%s\n' "$out" | sed -n 's/^pr: \(https:[^ ]*\).*/\1/p' | tail -n 1)
+	recit branch "$it" --arg repo "$(cat "$it/repo")" --arg branch "$(cat "$it/Branch")" --arg base "$(cat "$it/Base")" \
+		--arg head "$(cat "$it/sha")" --arg remote "$remote" --arg title "$(cat "$it/Title" 2>/dev/null)" \
+		--arg pr_existing "$(cat "$it/PR" 2>/dev/null)" --arg text_sha256 "$(fsha "$it/body")" --arg approval "$appr" \
+		--argjson pushed "$pj" --arg pr_url "$prurl" --arg result "${res:-error}" --argjson rc "$rc"
+	return "$rc"
+}
+
+# The first line of what gh said on stderr, for the log.
+errline() { head -n 1 "$1" 2>/dev/null | clean | cut -c1-200; }
+
+do_reply() {
+	it=$1
+	repo=$(cat "$it/repo")
+	n=$(cat "$it/prn")
+	url=$(jq -n --rawfile b "$it/body" '{body: $b}' |
+		gh api -X POST "repos/$repo/pulls/$n/comments/$(cat "$it/Comment")/replies" --input - --jq .html_url 2>"$it/err") || {
+		echo "FAILED: the reply was not posted"; head -n 3 "$it/err" | clean
+		recit post-failed "$it" --arg kind reply --arg repo "$repo" --arg thread "$(cat "$it/Thread")" --arg error "$(errline "$it/err")"
+		return 1
+	}
+	case $url in https://*) ;; *)
+		echo "FAILED: gh printed no URL, look at $repo#$n"
+		recit post-failed "$it" --arg kind reply --arg repo "$repo" --arg thread "$(cat "$it/Thread")" --arg error "no URL in the answer"
+		return 3 ;;
+	esac
+	echo "posted: $url"
+	log "replied on PR $n thread $url"
+	want=false
+	got=false
+	if [ "$(cat "$it/Resolve" 2>/dev/null)" = yes ]; then
+		want=true
+		res=$(gh api graphql -f id="$(cat "$it/Thread")" -f query='mutation($id:ID!){resolveReviewThread(input:{threadId:$id}){thread{isResolved}}}' --jq '.data.resolveReviewThread.thread.isResolved' 2>/dev/null </dev/null)
+		if [ "$res" = true ]; then echo "resolved the thread"; log "resolved PR $n thread $url"; got=true
+		else echo "WARN: the reply is posted but the thread was not resolved"; fi
+	fi
+	recit reply "$it" --arg repo "$repo" --arg pr "$n" --arg thread "$(cat "$it/Thread")" --arg comment "$(cat "$it/Comment")" \
+		--arg verdict "$(cat "$it/Verdict" 2>/dev/null)" --arg url "$url" --arg text_sha256 "$(fsha "$it/body")" \
+		--arg approval "$appr" --argjson resolve_requested "$want" --argjson resolved "$got"
+	return 0
+}
+
+do_new() {
+	it=$1
+	repo=$(cat "$it/repo")
+	target=$(cat "$it/target")
+	case $target in
+	"pr "*) out=$(gh pr comment "${target#pr }" --repo "$repo" --body-file "$it/body" 2>"$it/err" </dev/null) ;;
+	"issue "*) out=$(gh issue comment "${target#issue }" --repo "$repo" --body-file "$it/body" 2>"$it/err" </dev/null) ;;
+	*) out=$(gh issue create --repo "$repo" --title "$(cat "$it/Title")" --body-file "$it/body" 2>"$it/err" </dev/null) ;;
+	esac || {
+		echo "FAILED: nothing was posted"; head -n 3 "$it/err" | clean
+		recit post-failed "$it" --arg kind new --arg repo "$repo" --arg target "$target" --arg error "$(errline "$it/err")"
+		return 1
+	}
+	url=$(lasturl "$out")
+	case $url in https://*) ;; *)
+		echo "FAILED: gh printed no URL, look at $repo"
+		recit post-failed "$it" --arg kind new --arg repo "$repo" --arg target "$target" --arg error "no URL in the answer"
+		return 3 ;;
+	esac
+	echo "posted: $url"
+	case $target in
+	"pr "*) log "commented on PR ${target#pr } $url"; ev=comment ;;
+	"issue "*) log "commented on issue ${target#issue } $url"; ev=comment ;;
+	*) log "created issue $url ($(cat "$it/Title"))"; ev=issue ;;
+	esac
+	recit "$ev" "$it" --arg repo "$repo" --arg target "$target" --arg title "$(cat "$it/Title" 2>/dev/null)" \
+		--arg url "$url" --arg text_sha256 "$(fsha "$it/body")" --arg approval "$appr"
+	return 0
+}
+
+itemid() { # itemid <kind> <item dir>: what the item is about, for the log
+	case $1 in
+	branch) cat "$2/Branch" ;;
+	reply) cat "$2/Thread" ;;
+	new) cat "$2/target" ;;
+	esac
+}
+# recdec <action> <kind> <item dir>: a decision about an item that was not posted.
+recdec() {
+	recit "$1" "$3" --arg kind "$2" --arg id "$(itemid "$2" "$3")" --arg repo "$(cat "$3/repo" 2>/dev/null)"
+}
+
+posted=0
+failed=0
+appr=
+
+# Record the finished request files, report, archive, and leave.
+finish() { # finish <exit code>
+	code=$1
+	rec run-end --argjson posted "$posted" --argjson failed "$failed" --argjson planned "${total:-0}" --argjson exit "$code"
+	if [ -z "$check" ]; then
+		for d in "$tmp"/req/*; do
+			[ -f "$d/mark" ] || continue
+			[ ! -f "$d/notdone" ] || continue
+			incomplete=
+			for it in "$d"/[0-9][0-9][0-9]; do
+				{ [ -f "$it/planned" ] && [ ! -f "$it/ok" ]; } && incomplete=1
+			done
+			[ -z "$incomplete" ] || continue
+			cat "$d/mark" >>"$done"
+		done
+		echo "posted $posted of $total planned, failed $failed"
+		arch=$here/../../workflow-audit/scripts/archive.sh
+		if [ "$posted" -gt 0 ]; then
+			if [ -f "$arch" ]; then
+				echo "archiving the sandbox evidence"
+				sh "$arch" "${sandbox#sandbox-}" 2>&1 </dev/null | clean || echo "WARN: the archive step failed, the publishing is done"
+			else
+				echo "WARN: no archive script at $arch"
+			fi
+		fi
+	fi
+	exit "$code"
+}
+
+scan branches
+scan replies
+scan new
+
+total=$(wc -l <"$plan" | tr -d ' ')
+if [ "$total" -eq 0 ]; then
+	echo "Nothing to post."
+	finish 0
+fi
+
+echo
+echo "Plan, $total item(s). Nothing is posted until you answer:"
+i=0
+while read -r kind it; do
+	i=$((i + 1))
+	mark=" "
+	[ ! -s "$it/flag" ] || mark="*"
+	echo " $mark$i. $(label "$kind" "$it")"
+done <"$plan"
+echo "(* has a FLAG, asked one by one.) Read the texts above: no secrets, no security details or promised dates on a public repo."
+[ -z "$check" ] || finish 0
+
+ask() { # ask <prompt>: sets ans to the first letter, lower case
+	printf '%s ' "$1"
+	if IFS= read -r ans <&4; then ans=$(printf %s "$ans" | tr 'A-Z' 'a-z' | cut -c1); else echo; ans=q; fi
+}
+
+mode=
+while [ -z "$mode" ]; do
+	printf 'Post [a]ll, go [o]ne by one, show the diff of a branch [d N], or [q]uit? '
+	if ! IFS= read -r line <&4; then echo; line=q; fi
+	line=$(printf %s "$line" | tr 'A-Z' 'a-z')
+	case $line in
+	a) mode=all ;;
+	o) mode=one ;;
+	q) rec quit --arg at menu; finish 0 ;;
+	d\ [0-9]* | d[0-9]*)
+		num=${line#d}
+		num=${num# }
+		digits "$num" || { echo "answer d N with the number of an item"; continue; }
+		line=$(sed -n "${num}p" "$plan" 2>/dev/null)
+		case $line in
+		"branch "*)
+			it=${line#branch }
+			git diff --no-ext-diff --no-textconv --no-color "$(cat "$it/baseref")...refs/remotes/$sandbox/$(cat "$it/Branch")" | clean | ${PAGER:-less} ;;
+		*) echo "item $num is not a branch" ;;
+		esac ;;
+	*) echo "answer a, o, d N or q" ;;
+	esac
+done
+
+skipreq=
+exec 3<"$plan"
+i=0
+while read -r kind it <&3; do
+	i=$((i + 1))
+	req=${it%/*}
+	lbl=$(label "$kind" "$it")
+	if [ "$kind" = branch ]; then
+		case " $skipreq " in
+		*" $req "*)
+			echo "-- $i: left, an earlier branch of its request did not publish"
+			recdec left-unpublished "$kind" "$it"
+			continue ;;
+		esac
+	fi
+	go=
+	appr=
+	if [ "$mode" = all ] && [ ! -s "$it/flag" ]; then go=1; appr=all; fi
+	while [ -z "$go" ]; do
+		if [ -s "$it/flag" ]; then ask "$i of $total, has a FLAG: $lbl. Post? [y]es [n]o [s]kip for good [q]uit:"
+		else ask "$i of $total: $lbl. Post? [y]es [n]o [s]kip for good [a]ll the rest [q]uit:"; fi
+		case $ans in
+		y) go=1; if [ -s "$it/flag" ]; then appr=flagged; else appr=one; fi ;;
+		a) if [ -s "$it/flag" ]; then echo "answer y, n, s or q"; else mode=all; go=1; appr=all; fi ;;
+		n) break ;;
+		s) break ;;
+		q) recdec quit "$kind" "$it"; finish 0 ;;
+		*) echo "answer y, n, s or q" ;;
+		esac
+	done
+	if [ -z "$go" ]; then
+		if [ "$ans" = s ]; then : >"$it/ok"; echo "-- $i: skipped for good"; recdec skipped-for-good "$kind" "$it"
+		else echo "-- $i: left for later"; recdec declined "$kind" "$it"; fi
+		continue
+	fi
+	echo "-- posting $i of $total: $lbl"
+	case $kind in
+	branch) do_branch "$it" ;;
+	reply) do_reply "$it" ;;
+	new) do_new "$it" ;;
+	esac
+	rc=$?
+	case $rc in
+	0) posted=$((posted + 1)); : >"$it/ok" ;;
+	1) failed=$((failed + 1)); [ "$kind" != branch ] || skipreq="$skipreq $req" ;;
+	*) failed=$((failed + 1)); echo "STOP: something was written and a later step failed. Look at GitHub before running this again"; finish 3 ;;
+	esac
+done
+if [ "$failed" -gt 0 ]; then finish 1; fi
+finish 0
