@@ -24,6 +24,7 @@
       "$HOME/.config/jj",
       "$HOME/.local/wrappers",
       "$HOME/.ssh/key-tpm-*.pub",
+      "$HOME/knowledge",
       "/hub/all"
     ],
     "bypass_protection": [
