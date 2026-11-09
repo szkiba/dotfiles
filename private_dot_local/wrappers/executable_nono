@@ -1,0 +1,25 @@
+#!/usr/bin/env bash
+# Pass --allow-cwd to nono run, shell and wrap when they are typed in a
+# terminal, so the working directory is shared without the prompt. The access
+# level still comes from the profile (workdir.access). Put this folder first
+# in PATH.
+
+# Drop this folder from PATH, or `exec nono` would find this wrapper again and
+# loop.
+self=$(cd "${0%/*}" && pwd)
+p=":$PATH:"; p=${p//":$self:"/:}; p=${p#:}
+PATH=${p%:}
+
+# Without a terminal (scripts, agents, CI) keep nono's own rule: it wants an
+# explicit --allow-cwd there.
+if [ -t 0 ] && [ -t 1 ]; then
+  case $1 in
+    run|shell|wrap)
+      sub=$1
+      shift
+      exec nono "$sub" --allow-cwd "$@"
+      ;;
+  esac
+fi
+
+exec nono "$@"

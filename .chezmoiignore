@@ -10,6 +10,7 @@ test-prompt.sh
 # nono profiles, only where nono is installed
 {{ if not (lookPath "nono") -}}
 .config/nono
+.local/wrappers/nono
 {{ end -}}
 
 # SSH private key material — never manage in dotfiles
