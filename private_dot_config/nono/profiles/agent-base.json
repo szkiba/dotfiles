@@ -21,10 +21,13 @@
     "read": [
       "$HOME/.ai",
       "$HOME/.config/jj",
+      "$HOME/.local/wrappers",
       "/hub/all"
     ],
     "read_file": [
-      "$HOME/.gitconfig-machine"
+      "$HOME/.gitconfig-machine",
+      "$HOME/.config/gh/config.yml",
+      "$HOME/.config/gh/hosts.yml"
     ]
   },
   "network": {
