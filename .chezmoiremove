@@ -8,5 +8,9 @@
 .copilot/skills/kaizen
 .copilot/skills/knowledge-import
 .copilot/skills/workflow-audit
+.ai/skills/workflow-audit
+.claude/skills/workflow-audit
+.codex/skills/workflow-audit
 .copilot/copilot-instructions.md
 .config/nono/profiles/copilot.json
+.config/nono/profiles/audit.json

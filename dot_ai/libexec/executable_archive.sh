@@ -1,6 +1,6 @@
 #!/bin/sh
-# Copies what a sandbox's work left behind out to the host, so that the audit
-# and kaizen skills can still read it after the sandbox is removed.
+# Copies what a sandbox's work left behind out to the host, so that the kaizen
+# skill can still read it after the sandbox is removed.
 #
 #   archive.sh [--repo PATH] [--keep-days N] SANDBOX
 #

@@ -20,7 +20,7 @@
 #   5. prints the plan with the exact texts and asks once: post all, one by one,
 #      show the diff of a branch, or quit,
 #   6. posts in that order (branches first), logs to .ai/github-publisher/log.md,
-#      and runs the workflow-audit archive script when something was posted.
+#      and runs the archive script when something was posted.
 #
 # --check stops after step 5's plan and posts nothing. --remote is the remote to
 # push to (default origin) and --head-owner is for a fork, as for the publish-branch helper.
@@ -40,7 +40,7 @@
 # hidden direction marks is refused, so the text you read is the text that is
 # posted. Output from the other scripts is stripped of them before it is shown.
 #
-# The publish log, for the workflow-audit and kaizen skills: every run without
+# The publish log, for the kaizen skill: every run without
 # --check appends one JSON object per line to ~/.local/state/github-publish/log.jsonl.
 # It is outside the repo and mounted nowhere, so no sandbox can read or change it,
 # and a run stops at the start if it cannot write there. Each line has ts (UTC),
@@ -127,7 +127,7 @@ if [ -z "$check" ]; then
 	exec 4<"$tty"
 fi
 
-# The publish log: one JSON line per event, for the audit and kaizen skills. It
+# The publish log: one JSON line per event, for the kaizen skill. It
 # lives outside the repo, so a sandbox cannot read or change it. Without --check a
 # log that cannot be written stops the run before anything is posted. After that a
 # failed write only warns, so a post that happened is never hidden by it.
@@ -562,7 +562,7 @@ finish() { # finish <exit code>
 			cat "$d/mark" >>"$done"
 		done
 		echo "posted $posted of $total planned, failed $failed"
-		arch=$HOME/.ai/skills/workflow-audit/scripts/archive.sh
+		arch=$HOME/.ai/libexec/archive.sh
 		if [ "$posted" -gt 0 ]; then
 			if [ -f "$arch" ]; then
 				echo "archiving the sandbox evidence"

@@ -3,19 +3,19 @@ name: kaizen
 description: >
   Find small improvements to AGENTS.md and the skills from how they were used
   in real sessions. Reads the Claude Code and Codex transcripts of the host and
-  of sandboxes, and the git and jj state of repos, through the workflow-audit
-  script. Looks for rules that are broken, unclear, never used,
-  or that cost the user corrections and waiting, then proposes edits to the
-  chezmoi source and makes the approved ones. Use only when the user asks for
+  of sandboxes, and the git and jj state of repos, through the audit script.
+  Looks for rules that are broken, unclear, never used, or that cost the user
+  corrections and waiting, then proposes edits to the chezmoi source and makes
+  the approved ones. Use only when the user asks for
   kaizen, or to tune, improve or review the workflow, AGENTS.md or the skills.
   Runs on the host with Claude. Never commits, pushes or applies.
 ---
 
 # Kaizen
 
-workflow-audit asks whether the rules were followed. This skill asks whether the rules are any good, and improves them in small steps: look at real use, propose a few edits, make the approved ones, and measure the effect on the next run. It is not an audit, so it reports only what is worth changing, not every broken rule.
+The audit script asks whether the rules were followed. This skill asks whether the rules are any good, and improves them in small steps: look at real use, propose a few edits, make the approved ones, and measure the effect on the next run. It is not an audit, so it reports only what is worth changing, not every broken rule.
 
-Run it in a fresh session on the host, best with `nono as kaizen`, which starts in the chezmoi source folder with a read-only view of the evidence. The sbx commands do not work there, so refresh the archive from a plain terminal first. `chezmoi source-path` must work, because the rules live in its `dot_ai/` folder: `AGENTS.md` and `skills/*/SKILL.md`. In a sandbox `~/.ai` is read-only, so do not run it there. It needs the workflow-audit skill, whose script `~/.ai/skills/workflow-audit/scripts/audit.sh` does the counting.
+Run it in a fresh session on the host, best with `nono as kaizen`, which starts in the chezmoi source folder with a read-only view of the evidence. The sbx commands do not work there, so refresh the archive from a plain terminal first. `chezmoi source-path` must work, because the rules live in its `dot_ai/` folder: `AGENTS.md` and `skills/*/SKILL.md`. In a sandbox `~/.ai` is read-only, so do not run it there. The script `~/.ai/libexec/audit.sh` does the counting and needs `jq`.
 
 ## Ground rules
 
@@ -27,15 +27,19 @@ Edit only files under `dot_ai/` in the chezmoi source, and only what the user ap
 
 ## Collect the evidence
 
-Settle the period (default the last 14 days) and which repos and sandboxes to include, asking only for what is missing. The transcripts of a sandbox can be lost when it is removed, so the evidence for sandboxes comes from the archive in `~/.local/state/agent-archive/`, which `github-publish` refreshes every time it runs. For a sandbox that still exists, refresh it first with `sh ~/.ai/skills/workflow-audit/scripts/archive.sh <sandbox>`, run from its repo (`sbx ls` lists the sandboxes). Work done after the last refresh is not in the archive, and archives older than 8 weeks are deleted. Then run the counts and the checks over all transcript folders. When folders are given, the defaults are not read, so list the host ones too, those that exist, and the archived ones:
+Settle the period (default the last 14 days) and which repos and sandboxes to include, asking only for what is missing. The transcripts of a sandbox can be lost when it is removed, so the evidence for sandboxes comes from the archive in `~/.local/state/agent-archive/`, which `github-publish` refreshes every time it runs. For a sandbox that still exists, refresh it first with `sh ~/.ai/libexec/archive.sh <sandbox>`, run from its repo (`sbx ls` lists the sandboxes). Work done after the last refresh is not in the archive, and archives older than 8 weeks are deleted. Then run the counts and the checks over all transcript folders. When folders are given, the defaults are not read, so list the host ones too, those that exist, and the archived ones:
 
     a=${AGENT_ARCHIVE_DIR:-$HOME/.local/state/agent-archive}
     f="$HOME/.claude/projects $HOME/.codex/sessions"
     for d in "$a"/*/*/claude "$a"/*/*/codex; do [ -d "$d" ] && f="$f $d"; done
-    sh ~/.ai/skills/workflow-audit/scripts/audit.sh stats [--since YYYY-MM-DD] [--until YYYY-MM-DD] [--include-active] $f
-    sh ~/.ai/skills/workflow-audit/scripts/audit.sh transcripts --cwd / [--since YYYY-MM-DD] [--include-active] $f
+    sh ~/.ai/libexec/audit.sh stats [--since YYYY-MM-DD] [--until YYYY-MM-DD] [--include-active] $f
+    sh ~/.ai/libexec/audit.sh transcripts --cwd / [--since YYYY-MM-DD] [--include-active] $f
 
-Run workflow-audit's repo mode too for the repos in question. `stats` ends with a `publishing:` block, counted from the log that `github-publish` keeps on the host: runs, posts by kind and how they were approved, replies dropped as stale, checks failed by name, and what was declined or skipped. It is not in the sandbox archive. Many stale drops mean replies were drafted before the review settled. Many failed checks mean the curator step hands over branches that do not pass. Use `--since` and `--until` around a change to compare, as for the other counts. `stats` prints totals, the size of each rule file, which skills were used (a skill used only in a sandbox that was not read looks unused), the sessions with the most friction, and prompts that may be corrections. Errors are mostly ordinary failed commands. Denied permissions, interrupts, compactions and slow waits cost more. A slow wait is over 5 minutes without a message from the user, and it can be a stalled model, a long command or the user being away. Read a spot with `audit.sh context`, as workflow-audit explains, before you rely on it.
+Run the `repo` mode too for the repos in question. `stats` ends with a `publishing:` block, counted from the log that `github-publish` keeps on the host: runs, posts by kind and how they were approved, replies dropped as stale, checks failed by name, and what was declined or skipped. It is not in the sandbox archive. Many stale drops mean replies were drafted before the review settled. Many failed checks mean the curator step hands over branches that do not pass. Use `--since` and `--until` around a change to compare, as for the other counts. `stats` prints totals, the size of each rule file, which skills were used (a skill used only in a sandbox that was not read looks unused), the sessions with the most friction, and prompts that may be corrections. Errors are mostly ordinary failed commands. Denied permissions, interrupts, compactions and slow waits cost more. A slow wait is over 5 minutes without a message from the user, and it can be a stalled model, a long command or the user being away. Read a spot with `context`, described below, before you rely on it.
+
+The script has the modes `repo`, `transcripts`, `stats`, `publish` and `context`, and `audit.sh help` lists their options. `repo` reads the git and jj state of a repo and must run where the work was done, so for a sandbox use the `repo-audit.txt` that `archive.sh` saved in the archive. `repo`, `transcripts` and `publish` print one finding per line as `FAIL`, `WARN` or `INFO`, then a `checked:` line that says what was covered. A finding is a lead, not a verdict. `context` prints the prompts, the agent's text and the tool calls around a finding, shortened and masked, at most 60 events: `sh ~/.ai/libexec/audit.sh context [--root <folder>] <sid8> <from> [<to>]`, with the first 8 characters of the session and times like 2026-11-05T15:15. Use it instead of reading a raw transcript, which shows unmasked text. Add `--ignore-working-copy` to any jj command you run yourself, because a plain one saves the working copy as a new operation.
+
+What the findings mean. `goal-missing`, `goal-not-empty` and `empty-snapshot`: a jj milestone chain without its empty `Goal: ` commit, a goal commit that holds changes, or a snapshot with no changes. `review-claimed` (FAIL): a `Review:` line names a round with no answer file. `review-no-response`, `review-format` and `review-unverified` are weaker. `attribution` (FAIL): an AI attribution line in a commit or a command. `unsigned`, `signature` and `no-message` matter only before `github-publish` runs. `skill-skipped`: the prompt asked for a skill and the session shows no sign of it. `chat-mode`: after a `chat:` prompt, a file edit outside `/tmp` is a FAIL and a command that may change things is a WARN. `signing-bypass`: fine in a throwaway clone, a problem in the real repo. `commit-approval` and `outbound-write`: a commit, a push or a GitHub write, so read the prompt just before it to see whether the exact text was approved. The `publish-*` findings come from the publish log, for example `publish-partial` (FAIL), where a post went out and a later step failed.
 
 ## What is worth a proposal
 
@@ -50,7 +54,7 @@ Find the rule a lead belongs to and when it was added, and drop sessions from be
 
 ## Propose
 
-At most three proposals per run, the ones with the best evidence, because small changes are the point and each is measured later. Each needs at least two sessions or one explicit correction by the user. A one-off is not worth a rule. A proposal has the evidence (sessions, times, counts), the file and the current text, the exact new text, what it should improve and which check or stat shows that next time with today's number, and, when it adds text, what to shorten or remove to pay for it. Prefer shortening, merging, deleting, or moving a step into a script over adding a rule. Match the style of the file being edited.
+At most three proposals per run, the ones with the best evidence, because small changes are the point and each is measured later. Each needs at least two sessions or one explicit correction by the user. A one-off is not worth a rule. A proposal has the evidence (sessions, times, counts), the file and the current text, the exact new text, what it should improve and which check or stat shows that next time with today's number, and, when it adds text, what to shorten or remove to pay for it. Prefer shortening, merging, deleting, or moving a step into a script over adding a rule. Match the style of the file being edited. The checks live in `dot_ai/libexec/executable_audit.sh` (`triggers` for skills, command patterns for the rest, an awk part for commits), so a check that fires too often, or misses something the user had to point out, can be proposed there too.
 
 Ideas outside `dot_ai/`, such as settings, hooks or the sandbox kit, go in the report as notes, not as edits. If the user turned a proposal down earlier, do not repeat it. When they turn one down now, ask whether to remember that, and if so record it in your memory.
 
@@ -68,4 +72,4 @@ Keep it short and plain. Start with what was read, from the `stats:` line, and w
 
 ## What it cannot see
 
-The correction words are a rough filter. It misses polite or indirect corrections and flags many prompts that are not. Codex files give no error, denial or skill counts. A skill that was used by running its script without the Skill tool is not counted. Work from sandboxes is visible only in the archive, so what happened after the last archive run is missing. The script cannot say why a wait was long, or what the user changed by hand.
+The correction words are a rough filter. It misses polite or indirect corrections and flags many prompts that are not. Codex files give no error, denial or skill counts. In chat mode it does not see shell redirects, `rm` or `cp`, and it does not read text inside files written with Edit or Write. Commands that build a throwaway repo (`git init`, `git clone`, `mktemp`, `GIT_CONFIG_GLOBAL`) are not checked for commits and signing. A skill that was used by running its script without the Skill tool is not counted. Work from sandboxes is visible only in the archive, so what happened after the last archive run is missing. The script cannot say why a wait was long, or what the user changed by hand.

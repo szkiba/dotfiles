@@ -12,16 +12,11 @@
 #         That agent in its profile. Claude's and Codex's own sandboxes are turned
 #         off there: nono is the boundary, and bubblewrap cannot run inside it.
 #
-#       audit
-#         Claude Code in the audit profile, for the workflow-audit skill. Start it
-#         in the repo to audit: that folder is shared read-only, and the
-#         transcripts, the sandbox archive and the publish log are readable, none
-#         of them writable.
-#
 #       kaizen
 #         Claude Code in the kaizen profile, for the kaizen skill. It always
-#         starts in the chezmoi source folder, which is shared read-write, with the
-#         audit view plus write access to ~/.ai and the chezmoi state, so
+#         starts in the chezmoi source folder, which is shared read-write, with
+#         read access to the transcripts, the sandbox archive and the publish log
+#         plus write access to ~/.ai and the chezmoi state, so
 #         `chezmoi apply ~/.ai` works. Apply with that path: a full apply would run
 #         the sbx skill import, which cannot work in nono, and chezmoi would then
 #         count it as done. Only this shortcut allows `chezmoi apply` and
@@ -88,12 +83,11 @@ case $1 in
   as)
     shift
     case ${1:-} in
-      claude|codex|audit|kaizen) ;;
+      claude|codex|kaizen) ;;
       *)
         [ -z "${1:-}" ] || echo "nono as: unknown name $1" >&2
         echo "usage: nono as <name> [agent args]" >&2
         echo "  claude, codex            that agent in its nono profile" >&2
-        echo "  audit                    Claude Code to audit the workflow, read-only" >&2
         echo "  kaizen                   Claude Code to improve the rules, in the chezmoi source" >&2
         [ -z "${1:-}" ] && exit 0
         exit 1
@@ -102,8 +96,8 @@ case $1 in
     agent=$1
     profile=$1
     shift
-    # audit and kaizen are Claude Code with a profile of their own.
-    case $agent in audit|kaizen) agent=claude ;; esac
+    # kaizen is Claude Code with a profile of its own.
+    case $agent in kaizen) agent=claude ;; esac
     # A sandbox cannot start inside another one.
     if [ -n "${NONO_CAP_FILE:-}" ]; then
       echo "nono: already inside a nono sandbox, run $agent directly" >&2

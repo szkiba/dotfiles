@@ -18,7 +18,7 @@ Sandbox agents save what they learn, such as how to lint a repo or how signing w
 
 Run it only on the host. The knowledge repo is `$KNOWLEDGE_DIR`, by default `~/knowledge`: a git repo with one folder per project, one markdown file per note, an `INDEX.md` in each project folder, and `log.md` at the root. If it does not exist, ask the user where it should be and whether it will get a remote. Run `git init` there only after they answered. A remote needs the public or private question first, private by default, and public only when they confirm it. Never create a remote yourself.
 
-For the newest notes, run `sh ~/.ai/skills/workflow-audit/scripts/archive.sh <sandbox>` from the repo while the sandbox exists (`sbx ls` lists them). Otherwise the archive is what was kept, for 8 weeks.
+For the newest notes, run `sh ~/.ai/libexec/archive.sh <sandbox>` from the repo while the sandbox exists (`sbx ls` lists them). Otherwise the archive is what was kept, for 8 weeks.
 
 ## Notes
 
