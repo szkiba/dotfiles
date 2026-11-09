@@ -7,7 +7,7 @@
 #   [sandbox_workspace_write] network_access = true   no network limits for now
 #
 # Codex has no silent fallback: if bwrap cannot start, the command errors.
-# The nono shortcut (nono codex) overrides both with --sandbox danger-full-access.
+# The nono shortcut (nono as codex) overrides both with --sandbox danger-full-access.
 awk '
   BEGIN { top_done = 0; intable = 0; in_sww = 0; sww_seen = 0; na_done = 0
           top_line = "sandbox_mode = \"workspace-write\"" }

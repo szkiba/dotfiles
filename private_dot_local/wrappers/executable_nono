@@ -1,19 +1,45 @@
 #!/usr/bin/env bash
 # Two conveniences on top of nono. Put this folder first in PATH.
 #
-#   nono claude|codex|copilot [agent args]
-#     Run that agent in the nono profile of the same name. Everything after
-#     the agent name goes to the agent. For extra nono flags use the long form,
-#     nono run --profile <name> <flags> -- <agent>. Claude's and Codex's own
-#     sandboxes are turned off there: nono is the boundary, and bubblewrap cannot
-#     run inside it. Copilot's sandbox is not used (it cannot start on Ubuntu with
-#     the user namespace restriction on), so it needs nothing.
+#   nono as <name> [agent args]
+#     Run an agent in the nono profile of the same name. Everything after the name
+#     goes to the agent. For extra nono flags use the long form,
+#     nono run --profile <name> <flags> -- <agent>. The names live under "as" so
+#     they can never shadow a real nono subcommand (nono has its own audit, for
+#     one). Without a name it lists them.
+#
+#       claude, codex, copilot
+#         That agent in its profile. Claude's and Codex's own sandboxes are turned
+#         off there: nono is the boundary, and bubblewrap cannot run inside it.
+#         Copilot's sandbox is not used (it cannot start on Ubuntu with the user
+#         namespace restriction on), so it needs nothing.
+#
+#       audit
+#         Claude Code in the audit profile, for the workflow-audit skill. Start it
+#         in the repo to audit: that folder is shared read-only, and the
+#         transcripts, the sandbox archive and the publish log are readable, none
+#         of them writable.
+#
+#       kaizen
+#         Claude Code in the kaizen profile, for the kaizen skill. It always
+#         starts in the chezmoi source folder, which is shared read-write, with the
+#         audit view plus write access to ~/.ai and the chezmoi state, so
+#         `chezmoi apply ~/.ai` works. Apply with that path: a full apply would run
+#         the sbx skill import, which cannot work in nono, and chezmoi would then
+#         count it as done. Only this shortcut allows `chezmoi apply` and
+#         `git worktree add|remove|prune` without a permission prompt, and the
+#         EnterWorktree and ExitWorktree tools. The skill still says to apply only
+#         when you ask.
+#
+#     Every profile can sign commits through your ssh agents and read the public
+#     part of the TPM key. To commit as the machine identity instead of yours, start
+#     it with GIT_CONFIG_GLOBAL=~/.gitconfig-machine in the environment.
 #
 #   nono run|shell|wrap ...
 #     Pass --allow-cwd so the working directory is shared without the prompt.
 #
-# Both refuse, with a short message, to share a folder that holds your home
-# directory (see refuse_home).
+# The shortcuts and run|shell|wrap refuse, with a short message, to share a
+# folder that holds your home directory (see refuse_home).
 
 # Drop this folder from PATH, or `exec nono` would find this wrapper again and
 # loop.
@@ -56,9 +82,30 @@ refuse_home() {
 }
 
 case $1 in
-  claude|codex|copilot)
-    agent=$1
+  claude|codex|copilot|kaizen)
+    # The old spelling. These names are not nono subcommands, so say where they went.
+    echo "nono: use \"nono as $1\"" >&2
+    exit 1
+    ;;
+  as)
     shift
+    case ${1:-} in
+      claude|codex|copilot|audit|kaizen) ;;
+      *)
+        [ -z "${1:-}" ] || echo "nono as: unknown name $1" >&2
+        echo "usage: nono as <name> [agent args]" >&2
+        echo "  claude, codex, copilot   that agent in its nono profile" >&2
+        echo "  audit                    Claude Code to audit the workflow, read-only" >&2
+        echo "  kaizen                   Claude Code to improve the rules, in the chezmoi source" >&2
+        [ -z "${1:-}" ] && exit 0
+        exit 1
+        ;;
+    esac
+    agent=$1
+    profile=$1
+    shift
+    # audit and kaizen are Claude Code with a profile of their own.
+    case $agent in audit|kaizen) agent=claude ;; esac
     # A sandbox cannot start inside another one.
     if [ -n "${NONO_CAP_FILE:-}" ]; then
       echo "nono: already inside a nono sandbox, run $agent directly" >&2
@@ -66,8 +113,19 @@ case $1 in
     fi
     # Claude's native sandbox is on in settings.json and bubblewrap cannot run
     # inside nono, so turn it off for this run. --settings beats the user file.
+    # The kaizen run also gets permission rules, in this --settings only, so no
+    # other session is affected.
     if [ "$agent" = claude ]; then
-      set -- --settings '{"sandbox":{"enabled":false}}' "$@"
+      settings='{"sandbox":{"enabled":false}}'
+      if [ "$profile" = kaizen ]; then
+        settings='{"sandbox":{"enabled":false},"permissions":{"allow":["Bash(chezmoi apply:*)","Bash(git worktree add:*)","Bash(git worktree remove:*)","Bash(git worktree prune:*)","EnterWorktree","ExitWorktree"]}}'
+      fi
+      set -- --settings "$settings" "$@"
+    fi
+    # kaizen edits the chezmoi source, so it starts there whatever the folder.
+    if [ "$profile" = kaizen ]; then
+      src=$(chezmoi source-path 2>/dev/null) || src=$HOME/.local/share/chezmoi
+      cd "$src" 2>/dev/null || { echo "nono: cannot enter the chezmoi source folder $src" >&2; exit 1; }
     fi
     # Codex has its own sandbox, which clashes with nono's, so turn it off and
     # let nono be the boundary. --no-daemon keeps codex from using the shared
@@ -90,7 +148,7 @@ case $1 in
       set -- "${defaults[@]}" "$@"
     fi
     refuse_home
-    exec nono run "${cwd[@]}" --profile "$agent" -- "$agent" "$@"
+    exec nono run "${cwd[@]}" --profile "$profile" -- "$agent" "$@"
     ;;
   run|shell|wrap)
     sub=$1

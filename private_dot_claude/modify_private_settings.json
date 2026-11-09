@@ -9,7 +9,7 @@
 #                       sandbox never starts. Unix sockets are not limited.
 #   allowedDomains "*"  no network limits for now.
 #
-# The nono shortcut (nono claude) turns the sandbox off again with --settings,
+# The nono shortcut (nono as claude) turns the sandbox off again with --settings,
 # because bubblewrap cannot run inside nono.
 if ! command -v jq >/dev/null 2>&1; then
   echo "modify settings.json: jq is required to set Claude's sandbox keys" >&2

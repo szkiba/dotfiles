@@ -14,7 +14,7 @@ description: >
 
 The workflow lives in prose: AGENTS.md and the skills. Nothing else checks that agents follow it, so drift goes unnoticed until a commit looks wrong. This skill is the check. You are the inspector, not the maker or the checker. Look at the evidence the other agents left behind and say what you found.
 
-Run it in a fresh session, not inside one of the sessions being audited. The script skips sessions written in the last two minutes, so the run itself stays out of the result.
+Run it in a fresh session, not inside one of the sessions being audited. On the host, `nono as audit` started in the repo to audit gives a read-only view of that repo, the transcripts, the sandbox archive and the publish log. The sbx commands do not work there, so `sbx exec` checks of a sandbox and the archive refresh need a plain terminal. The script skips sessions written in the last two minutes, so the run itself stays out of the result.
 
 ## Read-only
 

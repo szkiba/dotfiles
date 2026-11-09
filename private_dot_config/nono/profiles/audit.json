@@ -1,0 +1,19 @@
+{
+  "extends": "claude",
+  "meta": {
+    "name": "audit",
+    "description": "Claude Code for the workflow-audit skill under nono: read-only view of the agent transcripts, the sandbox archive and the publish log"
+  },
+  "workdir": {
+    "access": "read"
+  },
+  "filesystem": {
+    "read": [
+      "$HOME/.local/state/agent-archive",
+      "$HOME/.local/state/github-publish",
+      "$HOME/.codex/sessions",
+      "$HOME/.copilot/session-state",
+      "/hub/synthetic"
+    ]
+  }
+}

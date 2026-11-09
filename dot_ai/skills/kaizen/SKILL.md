@@ -15,7 +15,7 @@ description: >
 
 workflow-audit asks whether the rules were followed. This skill asks whether the rules are any good, and improves them in small steps: look at real use, propose a few edits, make the approved ones, and measure the effect on the next run. It is not an audit, so it reports only what is worth changing, not every broken rule.
 
-Run it in a fresh session on the host. `chezmoi source-path` must work, because the rules live in its `dot_ai/` folder: `AGENTS.md` and `skills/*/SKILL.md`. In a sandbox `~/.ai` is read-only, so do not run it there. It needs the workflow-audit skill, whose script `~/.ai/skills/workflow-audit/scripts/audit.sh` does the counting.
+Run it in a fresh session on the host, best with `nono as kaizen`, which starts in the chezmoi source folder with a read-only view of the evidence. The sbx commands do not work there, so refresh the archive from a plain terminal first. `chezmoi source-path` must work, because the rules live in its `dot_ai/` folder: `AGENTS.md` and `skills/*/SKILL.md`. In a sandbox `~/.ai` is read-only, so do not run it there. It needs the workflow-audit skill, whose script `~/.ai/skills/workflow-audit/scripts/audit.sh` does the counting.
 
 ## Ground rules
 
@@ -58,7 +58,7 @@ Print the proposals as normal text, best first, then ask a short question on how
 
 ## Change and measure
 
-Make the approved edits in the working tree of the chezmoi source and show `git -C "$src" diff`. Say that nothing is committed or applied, and that a change reaches the sandboxes only after `chezmoi apply`. The user asks for the commit and the apply, with the usual approvals.
+Make the approved edits in the working tree of the chezmoi source and show `git -C "$src" diff`. Say that nothing is committed or applied, and that a change reaches the sandboxes only after `chezmoi apply`. The user asks for the commit and the apply, with the usual approvals. Under `nono as kaizen` the profile lets chezmoi write only `~/.ai` and its own state, so apply with `chezmoi apply ~/.ai`. A full apply would also run the sbx skill import, which cannot work there, and chezmoi would then count it as done, so the user does the full apply in their own terminal. Commits are signed there through the user's ssh agent as in any shell, so show the exact message and get the approval first, as AGENTS.md says. If the user started it with `GIT_CONFIG_GLOBAL=~/.gitconfig-machine`, the commit is made as the machine identity and signed with the TPM key.
 
 On a later run, compare before and after the date of the change with `stats --until <date>` and `stats --since <date>`, and with the check the proposal named. Sessions are picked by when their file was last written, so the day of the change is in both. Say whether the number moved, and that small numbers prove little. If a change did not help, propose to revert or reword it.
 
