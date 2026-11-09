@@ -8,11 +8,9 @@
 #     they can never shadow a real nono subcommand (nono has its own audit, for
 #     one). Without a name it lists them.
 #
-#       claude, codex, copilot
+#       claude, codex
 #         That agent in its profile. Claude's and Codex's own sandboxes are turned
 #         off there: nono is the boundary, and bubblewrap cannot run inside it.
-#         Copilot's sandbox is not used (it cannot start on Ubuntu with the user
-#         namespace restriction on), so it needs nothing.
 #
 #       audit
 #         Claude Code in the audit profile, for the workflow-audit skill. Start it
@@ -82,7 +80,7 @@ refuse_home() {
 }
 
 case $1 in
-  claude|codex|copilot|kaizen)
+  claude|codex|kaizen)
     # The old spelling. These names are not nono subcommands, so say where they went.
     echo "nono: use \"nono as $1\"" >&2
     exit 1
@@ -90,11 +88,11 @@ case $1 in
   as)
     shift
     case ${1:-} in
-      claude|codex|copilot|audit|kaizen) ;;
+      claude|codex|audit|kaizen) ;;
       *)
         [ -z "${1:-}" ] || echo "nono as: unknown name $1" >&2
         echo "usage: nono as <name> [agent args]" >&2
-        echo "  claude, codex, copilot   that agent in its nono profile" >&2
+        echo "  claude, codex            that agent in its nono profile" >&2
         echo "  audit                    Claude Code to audit the workflow, read-only" >&2
         echo "  kaizen                   Claude Code to improve the rules, in the chezmoi source" >&2
         [ -z "${1:-}" ] && exit 0

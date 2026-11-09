@@ -65,4 +65,4 @@ In a few lines: what was filed, rejected and left, and the commit if there was o
 
 ## Limits
 
-Only the Claude memory folder of the repo is archived. Codex and Copilot keep their memory elsewhere, so their notes are not seen. Agents use the knowledge repo only when a rule or the user points them at it.
+Only the Claude memory folder of the repo is archived. Codex keeps its memory elsewhere, so its notes are not seen. Agents use the knowledge repo only when a rule or the user points them at it.

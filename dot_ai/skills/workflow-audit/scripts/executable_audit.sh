@@ -11,9 +11,8 @@
 # Run it where the work was done, for a sandbox with `sbx exec`. It never
 # changes anything: jj runs with --ignore-working-copy and git without locks.
 #
-# transcripts: reads Claude Code, Codex and Copilot CLI session files (*.jsonl).
-# Without arguments it reads ~/.claude/projects, ~/.codex/sessions and
-# ~/.copilot/session-state. Only sessions
+# transcripts: reads Claude Code and Codex session files (*.jsonl).
+# Without arguments it reads ~/.claude/projects and ~/.codex/sessions. Only sessions
 # whose working directory starts with --cwd (default: the current directory)
 # and that were written since --since (default: 7 days ago) are read. Sessions
 # written in the last 2 minutes are skipped, so the session that runs the audit
@@ -28,7 +27,7 @@
 #
 # stats: counts for the kaizen skill, not findings. Per session: prompts, tool
 # calls, errors, denied permissions, interrupts, compactions and waits of over
-# 5 minutes, and for Copilot the permission prompts asked. Also which skills were used and which installed ones were not, the
+# 5 minutes. Also which skills were used and which installed ones were not, the
 # size of AGENTS.md and the skills, and prompts that look like corrections.
 # The options are those of transcripts, but --since defaults to 14 days ago and
 # --cwd to / (all sessions). --until DATE stops at sessions last written before
@@ -297,33 +296,6 @@ def cxsay: select(.type == "response_item" and .payload.type == "message" and .p
   | ([.payload.content[]? | select(.type == "output_text") | .text] | join("\n")) as $t | select($t != "")
   | {ts: $ts, kind: "say", name: "", text: $t};
 
-# ---- Copilot CLI lines (best effort). Only the bash, skill and ask_user tools
-# have been seen, so the file edit tool names below are a guess. An ask_user
-# answer is an approval of the user, kept as kind "answer".
-def pevents:
-  .timestamp as $ts
-  | if .type == "user.message" then
-      (.data.content // "" | gsub("^\\s+|\\s+$"; "")) as $t | select($t != "")
-      | {ts: $ts, kind: "prompt", name: "", text: $t}
-    elif .type == "tool.execution_start" then
-      (.data.toolName // "") as $n
-      | (.data.arguments | if type == "object" then . else {} end) as $a
-      | if $n == "bash" then {ts: $ts, kind: "tool", name: "Bash", text: ($a.command // "")}
-        elif $n == "skill" then {ts: $ts, kind: "tool", name: "Skill", text: ($a.skill // "")}
-        elif $n == "ask_user" then empty
-        elif ($n | IN("edit", "create", "write", "str_replace", "str_replace_editor", "apply_patch", "insert")) then
-          {ts: $ts, kind: "tool", name: "Edit", text: ($a.path // $a.file_path // $a.filePath // "")}
-        else {ts: $ts, kind: "tool", name: $n, text: ($a | tojson | .[0:20000])} end
-    elif .type == "human_response.recorded" then
-      (.data.response // {}) as $r
-      | ($r.content | if type == "object" then ([.[]? | tostring] | join(", ")) elif type == "string" then . else "" end) as $c
-      | select($c != "")
-      | {ts: $ts, kind: "answer", name: "", text: ($c + " (asked: " + (($r.message // "") | snip(120)) + ")")}
-    else empty end;
-def psay: select(.type == "assistant.message") | .timestamp as $ts
-  | (.data.content // "") as $t | select($t != "")
-  | {ts: $ts, kind: "say", name: "", text: $t};
-
 # ---- the hand-kept list of checks
 def triggers: [
   {skill: "milestone-snapshots", ask: "(?i)\\bmilestoned\\b|use milestones", used: "milestone-snapshots|bookmark create snap/"},
@@ -359,16 +331,15 @@ JQ_PROG=$(
 	cat <<'EOF'
 [inputs | fromjson?] as $L
 | ($L | map(select(.type == "session_meta")) | first // null) as $sm
-| ($L | map(select(.type == "session.start")) | first // null) as $cs
-| (if $sm != null then "codex" elif $cs != null then "copilot" else "claude" end) as $agent
-| (if $agent == "codex" then ($sm.payload.cwd // "") elif $agent == "copilot" then ($cs.data.context.cwd // "") else ([$L[] | .cwd | select(. != null)] | first // "") end) as $cwd
-| (if $agent == "codex" then ($sm.payload.id // "") elif $agent == "copilot" then ($cs.data.sessionId // "") else ([$L[] | .sessionId | select(. != null)] | first // "") end) as $sid
+| (if $sm != null then "codex" else "claude" end) as $agent
+| (if $agent == "codex" then ($sm.payload.cwd // "") else ([$L[] | .cwd | select(. != null)] | first // "") end) as $cwd
+| (if $agent == "codex" then ($sm.payload.id // "") else ([$L[] | .sessionId | select(. != null)] | first // "") end) as $sid
 | select($cwd | startswith($prefix))
-| [ $L[] | if $agent == "codex" then cxevents elif $agent == "copilot" then pevents else cevents end | select((.kind == "prompt" and (.text | test("^\\s*You are the checker in a maker-checker review"))) | not) ] as $ev
+| [ $L[] | if $agent == "codex" then cxevents else cevents end | select((.kind == "prompt" and (.text | test("^\\s*You are the checker in a maker-checker review"))) | not) ] as $ev
 | ($ev | to_entries) as $E
 | ($sid[0:8]) as $s
 | def where($e): "\($s) \($e.ts[0:16])";
-  def prevprompt($i): ([$E[] | select(.key < $i and (.value.kind | IN("prompt", "answer"))) | (if .value.kind == "answer" then "approval: " else "" end) + .value.text] | last // "") | snip(50);
+  def prevprompt($i): ([$E[] | select(.key < $i and .value.kind == "prompt") | .value.text] | last // "") | snip(50);
   (["#meta", $agent, $s, $cwd,
     ($ev | map(select(.kind == "prompt")) | length | tostring),
     ($ev | map(select(.kind == "tool")) | length | tostring)] | @tsv),
@@ -416,10 +387,10 @@ EOF
 JQ_CONTEXT=$(
 	cat <<'EOF'
 [inputs | fromjson?] as $L
-| (if ($L | any(.[]; .type == "session_meta")) then "codex" elif ($L | any(.[]; .type == "session.start")) then "copilot" else "claude" end) as $agent
-| [ $L[] | (if $agent == "codex" then (cxevents, cxsay) elif $agent == "copilot" then (pevents, psay) else (cevents, csay) end)
+| (if ($L | any(.[]; .type == "session_meta")) then "codex" else "claude" end) as $agent
+| [ $L[] | (if $agent == "codex" then (cxevents, cxsay) else (cevents, csay) end)
     | select(.ts >= $from and .ts[0:($to | length)] <= $to)
-    | [.ts[11:19], (if .kind == "prompt" then "user" elif .kind == "say" then "agent" elif .kind == "answer" then "approval" else .name end), (.text | snip(300))]
+    | [.ts[11:19], (if .kind == "prompt" then "user" elif .kind == "say" then "agent" else .name end), (.text | snip(300))]
     | select(.[2] != "") | @tsv ] as $rows
 | $rows[0:60][],
   (if ($rows | length) > 60 then "... \($rows | length - 60) more events in this window, narrow it" else empty end)
@@ -441,16 +412,14 @@ def epoch: sub("\\.[0-9]+"; "") | (try fromdateiso8601 catch null);
 
 [inputs | fromjson?] as $L
 | ($L | map(select(.type == "session_meta")) | first // null) as $sm
-| ($L | map(select(.type == "session.start")) | first // null) as $cs
-| (if $sm != null then "codex" elif $cs != null then "copilot" else "claude" end) as $agent
-| (if $agent == "codex" then ($sm.payload.cwd // "") elif $agent == "copilot" then ($cs.data.context.cwd // "") else ([$L[] | .cwd | select(. != null)] | first // "") end) as $cwd
-| (if $agent == "codex" then ($sm.payload.id // "") elif $agent == "copilot" then ($cs.data.sessionId // "") else ([$L[] | .sessionId | select(. != null)] | first // "") end) as $sid
+| (if $sm != null then "codex" else "claude" end) as $agent
+| (if $agent == "codex" then ($sm.payload.cwd // "") else ([$L[] | .cwd | select(. != null)] | first // "") end) as $cwd
+| (if $agent == "codex" then ($sm.payload.id // "") else ([$L[] | .sessionId | select(. != null)] | first // "") end) as $sid
 | select($cwd | startswith($prefix))
-| [ $L[] | if $agent == "codex" then cxevents elif $agent == "copilot" then pevents else cevents end | select((.kind == "prompt" and (.text | test("^\\s*You are the checker in a maker-checker review"))) | not) ] as $ev
+| [ $L[] | if $agent == "codex" then cxevents else cevents end | select((.kind == "prompt" and (.text | test("^\\s*You are the checker in a maker-checker review"))) | not) ] as $ev
 | ($sid[0:8]) as $s
 | def gaplines: if $agent == "claude" then select(.type == "user" or .type == "assistant")
-    elif $agent == "codex" then select(.type == "response_item")
-    else select((.type | type) == "string" and (.type | test("^(assistant|tool|permission|model)\\."))) end;
+    else select(.type == "response_item") end;
   ([ $L[] | select((.timestamp | type) == "string") | .timestamp ] | sort) as $times
   | ($times | first // "") as $first
   | ($times | last // "") as $last
@@ -462,18 +431,12 @@ def epoch: sub("\\.[0-9]+"; "") | (try fromdateiso8601 catch null);
        { err: ([ $L[] | cresults | select(.err and ((.text | test(denied)) | not)) ] | length),
          den: ([ $L[] | cresults | select(.err and (.text | test(denied))) ] | length),
          int: ($intts | length),
-         cmp: ([ $L[] | select(.type == "system" and .subtype == "compact_boundary") ] | length), ask: "-" }
-     elif $agent == "copilot" then
-       { err: ([ $L[] | select(.type == "tool.execution_complete" and .data.success == false) ] | length),
-         den: ([ $L[] | select(.type == "permission.completed" and ((.data.result.kind // "approved") | startswith("approved") | not)) ] | length),
-         int: ([ $L[] | select((.type | type) == "string" and (.type | test("(?i)abort|cancel|interrupt"))) ] | length),
-         cmp: ([ $L[] | select((.type | type) == "string" and (.type | test("(?i)compact"))) ] | length),
-         ask: ([ $L[] | select(.type == "permission.requested") ] | length) }
-     else { err: "-", den: "-", int: "-", cmp: "-", ask: "-" } end) as $c
+         cmp: ([ $L[] | select(.type == "system" and .subtype == "compact_boundary") ] | length) }
+     else { err: "-", den: "-", int: "-", cmp: "-" } end) as $c
   # Waits of over 5 minutes that do not end in a message of the user: a stalled
   # model call, a long command, or the user away from an approval prompt.
   | ([ $L[] | gaplines | select((.timestamp | type) == "string") | {ts: .timestamp, e: (.timestamp | epoch)} | select(.e != null) ] | sort_by(.e)) as $G
-  | ($ev | map(select(.kind | IN("prompt", "answer")) | .ts)) as $uts
+  | ($ev | map(select(.kind == "prompt") | .ts)) as $uts
   | ([ range(1; ($G | length)) as $k | ($G[$k].e - $G[$k - 1].e) as $gap | select($gap > 300) | select(($uts | any(. == $G[$k].ts)) | not) | $gap ]) as $slow
   | ( [ $ev[] | select(.kind == "tool" and .name == "Skill") | .text ]
       + [ $ev[] | select(.kind == "prompt") | .text | capture("^/(?<n>[A-Za-z0-9:_-]+)") | .n | select(. as $n | $installed | any(. == $n)) ] ) as $sk
@@ -481,7 +444,7 @@ def epoch: sub("\\.[0-9]+"; "") | (try fromdateiso8601 catch null);
       ($ev | map(select(.kind == "prompt")) | length | tostring),
       ($ev | map(select(.kind == "tool")) | length | tostring),
       ($c.err | tostring), ($c.den | tostring), ($c.int | tostring), ($c.cmp | tostring),
-      ($slow | length | tostring), ((($slow | max // 0) / 60) | floor | tostring), ($cwd | snip(60)), ($c.ask | tostring)] | @tsv),
+      ($slow | length | tostring), ((($slow | max // 0) / 60) | floor | tostring), ($cwd | snip(60))] | @tsv),
     ( $sk[] | ["#skill", $s, .] | @tsv ),
     ( ($ev | map(select(.kind == "prompt" and .ts >= $since))) as $P
       | ($P | map(select(.text | test(corr)) | .ts)) as $byre
@@ -497,7 +460,7 @@ EOF
 # Without --root arguments, read the default transcript folders.
 default_roots() {
 	if [ ! -s "$tmp/roots" ]; then
-		for d in "$HOME/.claude/projects" "$HOME/.codex/sessions" "$HOME/.copilot/session-state"; do
+		for d in "$HOME/.claude/projects" "$HOME/.codex/sessions"; do
 			[ -d "$d" ] && echo "$d" >>"$tmp/roots"
 		done
 	fi
@@ -586,7 +549,7 @@ cmd_transcripts() {
 
 	collect_files
 
-	nclaude=0 ncodex=0 ncopilot=0 nprompts=0 ntools=0 nread=0
+	nclaude=0 ncodex=0 nprompts=0 ntools=0 nread=0
 	: >"$tmp/meta"
 	while IFS= read -r f; do
 		if ! jq -Rn -r --arg since "$since" --arg prefix "$prefix" "$JQ_DEFS
@@ -603,13 +566,12 @@ $JQ_PROG" "$f" >"$tmp/one" 2>"$tmp/jq.err"; then
 	if [ -s "$tmp/meta" ]; then
 		nclaude=$(awk -F'\t' '$2 == "claude"' "$tmp/meta" | wc -l)
 		ncodex=$(awk -F'\t' '$2 == "codex"' "$tmp/meta" | wc -l)
-		ncopilot=$(awk -F'\t' '$2 == "copilot"' "$tmp/meta" | wc -l)
 		nprompts=$(awk -F'\t' '{ n += $5 } END { print n + 0 }' "$tmp/meta")
 		ntools=$(awk -F'\t' '{ n += $6 } END { print n + 0 }' "$tmp/meta")
 	fi
 	[ "$nread" -gt 0 ] || finding INFO no-sessions "no session matched, check --cwd ($prefix) and --since ($since)"
 	[ "$skipped" -eq 0 ] || finding INFO active-skipped "$skipped session file(s) written in the last 2 minutes were skipped, use --include-active to read them"
-	report "$nread sessions ($nclaude claude, $ncodex codex, $ncopilot copilot) with working directory under $prefix, written since $since; $nprompts prompts, $ntools tool calls"
+	report "$nread sessions ($nclaude claude, $ncodex codex) with working directory under $prefix, written since $since; $nprompts prompts, $ntools tool calls"
 }
 
 # ------------------------------------------------------------ publish mode
@@ -780,10 +742,10 @@ $JQ_STATS" "$f" >"$tmp/one" 2>"$tmp/jq.err"; then
 		return 0
 	fi
 	awk -F'\t' -v prefix="$prefix" -v window="$window" '
-		{ a[$2]++; p += $6; t += $7; e += $8; d += $9; i += $10; c += $11; s += $12; if ($15 != "-") k += $15; n++ }
+		{ a[$2]++; p += $6; t += $7; e += $8; d += $9; i += $10; c += $11; s += $12; n++ }
 		END {
-			printf "stats: %d sessions (%d claude, %d codex, %d copilot) with working directory under %s, %s\n", n, a["claude"], a["codex"], a["copilot"], prefix, window
-			printf "totals: prompts=%d tool-calls=%d errors=%d denied=%d interrupts=%d compactions=%d slow-waits=%d copilot-permission-prompts=%d\n", p, t, e, d, i, c, s, k
+			printf "stats: %d sessions (%d claude, %d codex) with working directory under %s, %s\n", n, a["claude"], a["codex"], prefix, window
+			printf "totals: prompts=%d tool-calls=%d errors=%d denied=%d interrupts=%d compactions=%d slow-waits=%d\n", p, t, e, d, i, c, s
 		}' "$tmp/sessions"
 
 	rules=$(dirname -- "$skills")/AGENTS.md
@@ -813,9 +775,6 @@ $JQ_STATS" "$f" >"$tmp/one" 2>"$tmp/jq.err"; then
 	echo "sessions with the most friction (denied x3, interrupts x2, compactions, slow waits):"
 	awk -F'\t' '{ printf "%d\t%s\n", $9 * 3 + $10 * 2 + $11 + $12, $0 }' "$tmp/sessions" | sort -t "$tab" -k1,1nr | head -n 8 |
 		awk -F'\t' '$1 > 0 { printf "  %s %s %s %sm prompts=%s tools=%s errors=%s denied=%s interrupts=%s compactions=%s slow-waits=%s (slowest %sm) %s\n", $4, $3, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15 }'
-
-	echo "permission prompts asked in Copilot sessions:"
-	awk -F'\t' '$2 == "copilot" { printf "  %s %s %sm asked=%s\n", $3, $4, $5, $15; f = 1 } END { if (!f) print "  none" }' "$tmp/sessions" | sort
 
 	grep "^#corr${tab}" "$tmp/stat.out" >"$tmp/corr"
 	nc=$(wc -l <"$tmp/corr")

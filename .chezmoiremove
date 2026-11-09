@@ -5,3 +5,8 @@
 .claude/skills/github-publisher
 .codex/skills/github-publisher
 .copilot/skills/github-publisher
+.copilot/skills/kaizen
+.copilot/skills/knowledge-import
+.copilot/skills/workflow-audit
+.copilot/copilot-instructions.md
+.config/nono/profiles/copilot.json

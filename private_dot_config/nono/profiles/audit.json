@@ -12,7 +12,6 @@
       "$HOME/.local/state/agent-archive",
       "$HOME/.local/state/github-publish",
       "$HOME/.codex/sessions",
-      "$HOME/.copilot/session-state",
       "/hub/synthetic"
     ]
   }

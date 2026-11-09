@@ -2,9 +2,9 @@
 name: kaizen
 description: >
   Find small improvements to AGENTS.md and the skills from how they were used
-  in real sessions. Reads the Claude Code, Codex and Copilot CLI transcripts of
-  the host and of sandboxes, and the git and jj state of repos, through the
-  workflow-audit script. Looks for rules that are broken, unclear, never used,
+  in real sessions. Reads the Claude Code and Codex transcripts of the host and
+  of sandboxes, and the git and jj state of repos, through the workflow-audit
+  script. Looks for rules that are broken, unclear, never used,
   or that cost the user corrections and waiting, then proposes edits to the
   chezmoi source and makes the approved ones. Use only when the user asks for
   kaizen, or to tune, improve or review the workflow, AGENTS.md or the skills.
@@ -30,7 +30,7 @@ Edit only files under `dot_ai/` in the chezmoi source, and only what the user ap
 Settle the period (default the last 14 days) and which repos and sandboxes to include, asking only for what is missing. The transcripts of a sandbox can be lost when it is removed, so the evidence for sandboxes comes from the archive in `~/.local/state/agent-archive/`, which `github-publish` refreshes every time it runs. For a sandbox that still exists, refresh it first with `sh ~/.ai/skills/workflow-audit/scripts/archive.sh <sandbox>`, run from its repo (`sbx ls` lists the sandboxes). Work done after the last refresh is not in the archive, and archives older than 8 weeks are deleted. Then run the counts and the checks over all transcript folders. When folders are given, the defaults are not read, so list the host ones too, those that exist, and the archived ones:
 
     a=${AGENT_ARCHIVE_DIR:-$HOME/.local/state/agent-archive}
-    f="$HOME/.claude/projects $HOME/.codex/sessions $HOME/.copilot/session-state"
+    f="$HOME/.claude/projects $HOME/.codex/sessions"
     for d in "$a"/*/*/claude "$a"/*/*/codex; do [ -d "$d" ] && f="$f $d"; done
     sh ~/.ai/skills/workflow-audit/scripts/audit.sh stats [--since YYYY-MM-DD] [--until YYYY-MM-DD] [--include-active] $f
     sh ~/.ai/skills/workflow-audit/scripts/audit.sh transcripts --cwd / [--since YYYY-MM-DD] [--include-active] $f
@@ -64,8 +64,8 @@ On a later run, compare before and after the date of the change with `stats --un
 
 ## Report
 
-Keep it short and plain. Start with what was read, from the `stats:` line, and what was not: sandboxes that were gone, the Codex and Copilot parsers being best effort. Then the proposals, then what you looked at and found fine, then what could not be checked.
+Keep it short and plain. Start with what was read, from the `stats:` line, and what was not: sandboxes that were gone, the Codex parser being best effort. Then the proposals, then what you looked at and found fine, then what could not be checked.
 
 ## What it cannot see
 
-The correction words are a rough filter. It misses polite or indirect corrections and flags many prompts that are not. Codex files give no error, denial or skill counts, and the Copilot denial and interrupt counts are guesses from event names. A skill that was used by running its script without the Skill tool is not counted. Work from sandboxes is visible only in the archive, so what happened after the last archive run is missing. The script cannot say why a wait was long, or what the user changed by hand.
+The correction words are a rough filter. It misses polite or indirect corrections and flags many prompts that are not. Codex files give no error, denial or skill counts. A skill that was used by running its script without the Skill tool is not counted. Work from sandboxes is visible only in the archive, so what happened after the last archive run is missing. The script cannot say why a wait was long, or what the user changed by hand.
