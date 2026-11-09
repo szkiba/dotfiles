@@ -1,0 +1,26 @@
+#!/bin/sh
+# Turn on Claude Code's native sandbox and keep everything else Claude saved in
+# settings.json (plugins, model, theme). Only the sandbox keys below are managed.
+#
+#   failIfUnavailable   refuse commands instead of running them unsandboxed when
+#                       the sandbox cannot start (for example bwrap is missing).
+#   allowAllUnixSockets skip the seccomp helper. Ubuntu's AppArmor user
+#                       namespace restriction blocks that helper, and with it the
+#                       sandbox never starts. Unix sockets are not limited.
+#   allowedDomains "*"  no network limits for now.
+#
+# The nono shortcut (nono claude) turns the sandbox off again with --settings,
+# because bubblewrap cannot run inside nono.
+if ! command -v jq >/dev/null 2>&1; then
+  echo "modify settings.json: jq is required to set Claude's sandbox keys" >&2
+  exit 1
+fi
+
+in=$(cat)
+[ -n "$in" ] || in='{}'
+printf '%s\n' "$in" | jq '
+  .sandbox.enabled = true
+  | .sandbox.failIfUnavailable = true
+  | .sandbox.network.allowAllUnixSockets = true
+  | .sandbox.network.allowedDomains = (((.sandbox.network.allowedDomains // []) + ["*"]) | unique)
+'

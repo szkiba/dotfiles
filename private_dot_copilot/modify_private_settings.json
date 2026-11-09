@@ -1,0 +1,19 @@
+#!/bin/sh
+# Set Copilot CLI's sandbox policy and keep everything else Copilot saved in
+# settings.json. Only the policy keys below are managed. sandbox.enabled is left
+# out on purpose: the copilot wrapper in ~/.local/wrappers passes --sandbox, which
+# fails closed when the sandbox cannot start, and which stays off inside nono.
+# Network is not limited for now.
+if ! command -v jq >/dev/null 2>&1; then
+  echo "modify settings.json: jq is required to set Copilot's sandbox policy" >&2
+  exit 1
+fi
+
+in=$(cat)
+[ -n "$in" ] || in='{}'
+printf '%s\n' "$in" | jq '
+  .sandbox.addCurrentWorkingDirectory = true
+  | .sandbox.allowDevToolAccess = true
+  | .sandbox.userPolicy.network.allowOutbound = true
+  | .sandbox.userPolicy.network.allowLocalNetwork = true
+'

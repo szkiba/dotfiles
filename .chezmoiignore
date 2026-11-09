@@ -13,6 +13,18 @@ test-prompt.sh
 .local/wrappers/nono
 {{ end -}}
 
+# Agent sandbox settings, only where the agent is installed
+{{ if not (lookPath "claude") -}}
+.claude/settings.json
+{{ end -}}
+{{ if not (lookPath "codex") -}}
+.codex/config.toml
+{{ end -}}
+{{ if not (lookPath "copilot") -}}
+.copilot/settings.json
+.local/wrappers/copilot
+{{ end -}}
+
 # SSH private key material — never manage in dotfiles
 .ssh/id_*
 .ssh/*_rsa

@@ -1,0 +1,29 @@
+#!/bin/sh
+# Turn on Codex's native sandbox and keep everything else Codex saved in
+# config.toml (trusted projects, plugins, marketplaces). Two settings are managed:
+#
+#   sandbox_mode = "workspace-write"             top-level, must stay above the
+#                                                first [table]
+#   [sandbox_workspace_write] network_access = true   no network limits for now
+#
+# Codex has no silent fallback: if bwrap cannot start, the command errors.
+# The nono shortcut (nono codex) overrides both with --sandbox danger-full-access.
+awk '
+  BEGIN { top_done = 0; intable = 0; in_sww = 0; sww_seen = 0; na_done = 0
+          top_line = "sandbox_mode = \"workspace-write\"" }
+  /^\[/ {
+    if (in_sww && !na_done) { print "network_access = true"; na_done = 1 }
+    if (!top_done) { print top_line; print ""; top_done = 1 }
+    intable = 1
+    in_sww = ($0 ~ /^\[sandbox_workspace_write\][ \t]*(#.*)?$/)
+    if (in_sww) sww_seen = 1
+  }
+  !intable && /^sandbox_mode[ \t]*=/ { if (!top_done) { print top_line; top_done = 1 } next }
+  in_sww && /^network_access[ \t]*=/ { if (!na_done) { print "network_access = true"; na_done = 1 } next }
+  { print }
+  END {
+    if (!top_done) print top_line
+    if (in_sww && !na_done) print "network_access = true"
+    if (!sww_seen) { print ""; print "[sandbox_workspace_write]"; print "network_access = true" }
+  }
+'

@@ -4,7 +4,8 @@
 #   nono claude|codex|copilot [agent args]
 #     Run that agent in the nono profile of the same name. Everything after
 #     the agent name goes to the agent. For extra nono flags use the long form,
-#     nono run --profile <name> <flags> -- <agent>.
+#     nono run --profile <name> <flags> -- <agent>. The agent's own sandbox is
+#     turned off there: nono is the boundary, and bubblewrap cannot run inside it.
 #
 #   nono run|shell|wrap ...
 #     Pass --allow-cwd so the working directory is shared without the prompt.
@@ -36,6 +37,12 @@ case $1 in
     if [ -n "${NONO_CAP_FILE:-}" ]; then
       echo "nono: already inside a nono sandbox, run $agent directly" >&2
       exit 1
+    fi
+    # Claude's native sandbox is on in settings.json and bubblewrap cannot run
+    # inside nono, so turn it off for this run. --settings beats the user file.
+    # (The copilot wrapper does the same for Copilot, by not passing --sandbox.)
+    if [ "$agent" = claude ]; then
+      set -- --settings '{"sandbox":{"enabled":false}}' "$@"
     fi
     # Codex has its own sandbox, which clashes with nono's, so turn it off and
     # let nono be the boundary. --no-daemon keeps codex from using the shared

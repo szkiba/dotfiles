@@ -1,0 +1,23 @@
+#!/usr/bin/env bash
+# Run Copilot CLI with its native command sandbox on. Put this folder first in
+# PATH.
+#
+# --sandbox fails closed: if the sandbox cannot start, shell commands fail. A
+# saved sandbox.enabled setting would instead switch itself off on a host that
+# cannot run it, so the setting is not used. The policy (paths, network) is in
+# ~/.copilot/settings.json.
+#
+# Inside nono the sandbox stays off, because bubblewrap cannot run inside nono.
+# nono sets NONO_CAP_FILE for everything it starts.
+
+# Drop this folder from PATH, or `exec copilot` would find this wrapper again and
+# loop.
+self=$(cd "${0%/*}" && pwd)
+p=":$PATH:"; p=${p//":$self:"/:}; p=${p#:}
+PATH=${p%:}
+
+if [ -z "${NONO_CAP_FILE:-}" ]; then
+  exec copilot --sandbox "$@"
+fi
+
+exec copilot "$@"
