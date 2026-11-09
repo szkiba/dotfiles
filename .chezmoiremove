@@ -1,5 +1,0 @@
-# Files an earlier version installed and that no longer exist in the source.
-# chezmoi does not delete these by itself. Remove these lines once every machine
-# has applied this.
-.ai/bin/agent-isolation
-.config/sandboxes/kits/agent-isolation

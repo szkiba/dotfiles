@@ -11,10 +11,6 @@
 #
 # The nono shortcut (nono claude) turns the sandbox off again with --settings,
 # because bubblewrap cannot run inside nono.
-#
-# Cleanup: an earlier version also set a status line that ran agent-isolation.
-# That script is gone, so this removes the status line, but only if it is that
-# one. Delete the last jq line once every machine has applied this.
 if ! command -v jq >/dev/null 2>&1; then
   echo "modify settings.json: jq is required to set Claude's sandbox keys" >&2
   exit 1
@@ -27,5 +23,4 @@ printf '%s\n' "$in" | jq '
   | .sandbox.failIfUnavailable = true
   | .sandbox.network.allowAllUnixSockets = true
   | .sandbox.network.allowedDomains = (((.sandbox.network.allowedDomains // []) + ["*"]) | unique)
-  | if ((.statusLine.command? // "") | tostring | contains("agent-isolation")) then del(.statusLine) else . end
 '
