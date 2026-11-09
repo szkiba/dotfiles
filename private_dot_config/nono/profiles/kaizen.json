@@ -2,7 +2,7 @@
   "extends": "audit",
   "meta": {
     "name": "kaizen",
-    "description": "Claude Code for the kaizen skill under nono: the audit view, plus the chezmoi source to edit, ~/.ai to apply to and ~/knowledge to write"
+    "description": "Claude Code for the kaizen skill under nono: the audit view, plus the chezmoi source to edit, ~/.ai to apply to and ~/knowledge to write, and a GitHub token from 1Password for git over https"
   },
   "workdir": {
     "access": "readwrite"
@@ -13,5 +13,17 @@
       "$HOME/.config/chezmoi",
       "$HOME/knowledge"
     ]
+  },
+  "env_credentials": {
+    "op://GitHub/cli/token": "GH_TOKEN"
+  },
+  "environment": {
+    "set_vars": {
+      "GIT_CONFIG_COUNT": "2",
+      "GIT_CONFIG_KEY_0": "credential.https://github.com.helper",
+      "GIT_CONFIG_VALUE_0": "",
+      "GIT_CONFIG_KEY_1": "credential.https://github.com.helper",
+      "GIT_CONFIG_VALUE_1": "!/home/linuxbrew/.linuxbrew/bin/gh auth git-credential"
+    }
   }
 }
