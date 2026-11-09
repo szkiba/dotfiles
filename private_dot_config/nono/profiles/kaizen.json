@@ -2,7 +2,7 @@
   "extends": "audit",
   "meta": {
     "name": "kaizen",
-    "description": "Claude Code for the kaizen skill under nono: the audit view, plus the chezmoi source to edit and ~/.ai to apply to"
+    "description": "Claude Code for the kaizen skill under nono: the audit view, plus the chezmoi source to edit, ~/.ai to apply to and ~/knowledge to write"
   },
   "workdir": {
     "access": "readwrite"
@@ -10,7 +10,8 @@
   "filesystem": {
     "allow": [
       "$HOME/.ai",
-      "$HOME/.config/chezmoi"
+      "$HOME/.config/chezmoi",
+      "$HOME/knowledge"
     ]
   }
 }
