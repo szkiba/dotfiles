@@ -1,17 +1,18 @@
 #!/bin/sh
-# Show which isolation layer Copilot CLI runs in, in its status line
-# (~/.ai/bin/agent-isolation), and keep everything else Copilot saved in
-# settings.json. Only the statusLine key is managed.
+# Cleanup only. An earlier version set a Copilot status line that ran
+# agent-isolation, and created settings.json to hold it. That script is gone, so
+# this removes the status line, but only if it is that one, and leaves everything
+# else Copilot saved. Delete this file once every machine has applied it.
 #
-# Copilot has no sandbox here, so on the host this shows NONE. Its own sandbox
-# cannot start while Ubuntu restricts unprivileged user namespaces.
+# With no settings.json there is nothing to clean, so it prints nothing and
+# chezmoi does not create the file.
 if ! command -v jq >/dev/null 2>&1; then
-  echo "modify settings.json: jq is required to set Copilot's status line" >&2
+  echo "modify settings.json: jq is required to clean up Copilot's status line" >&2
   exit 1
 fi
 
 in=$(cat)
-[ -n "$in" ] || in='{}'
+[ -n "$in" ] || exit 0
 printf '%s\n' "$in" | jq '
-  .statusLine = {"type": "command", "command": "bash ~/.ai/bin/agent-isolation --agent copilot"}
+  if ((.statusLine.command? // "") | tostring | contains("agent-isolation")) then del(.statusLine) else . end
 '
