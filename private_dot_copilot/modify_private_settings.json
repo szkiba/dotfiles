@@ -1,0 +1,17 @@
+#!/bin/sh
+# Show which isolation layer Copilot CLI runs in, in its status line
+# (~/.ai/bin/agent-isolation), and keep everything else Copilot saved in
+# settings.json. Only the statusLine key is managed.
+#
+# Copilot has no sandbox here, so on the host this shows NONE. Its own sandbox
+# cannot start while Ubuntu restricts unprivileged user namespaces.
+if ! command -v jq >/dev/null 2>&1; then
+  echo "modify settings.json: jq is required to set Copilot's status line" >&2
+  exit 1
+fi
+
+in=$(cat)
+[ -n "$in" ] || in='{}'
+printf '%s\n' "$in" | jq '
+  .statusLine = {"type": "command", "command": "bash ~/.ai/bin/agent-isolation --agent copilot"}
+'

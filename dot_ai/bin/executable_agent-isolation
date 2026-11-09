@@ -1,0 +1,159 @@
+#!/usr/bin/env bash
+# agent-isolation: print which isolation layers an agent runs in, as one short
+# label for a status line. Layers are listed strongest first, joined with +, and
+# coloured by the strongest one.
+#
+#   agent-isolation [--agent claude|codex|copilot] [--layer NAME]... [--plain]
+#
+#   microvm    green          IS_SANDBOX=1, an sbx sandbox
+#   vm         green          systemd-detect-virt --vm
+#   container  yellow         systemd-detect-virt --container, named types only
+#   nono       orange         NONO_CAP_FILE is set
+#   native     red            the agent's own sandbox, read from its config
+#   NONE       white on red   none of the above
+#
+# --layer NAME declares a layer the caller knows about (microvm, vm, container,
+# nono, native), for a launcher or kit that cannot rely on detection.
+# --plain, or NO_COLOR set, prints the label without colour codes.
+#
+# native is checked for Claude (sandbox.enabled in settings.json) and Codex
+# (sandbox_mode in config.toml). Copilot has no native sandbox here. It is not
+# counted under nono, because the nono shortcuts turn the native sandbox off.
+#
+# This reads no secrets and writes nothing. A status line passes JSON on stdin;
+# it is ignored.
+
+set -u
+
+usage() {
+  echo "usage: agent-isolation [--agent claude|codex|copilot] [--layer NAME]... [--plain]" >&2
+}
+
+agent=
+plain=
+declared=()
+while [ $# -gt 0 ]; do
+  case $1 in
+    --agent)
+      [ $# -ge 2 ] || { usage; exit 2; }
+      agent=$2
+      shift 2
+      ;;
+    --layer)
+      [ $# -ge 2 ] || { usage; exit 2; }
+      declared+=("$2")
+      shift 2
+      ;;
+    --plain)
+      plain=1
+      shift
+      ;;
+    -h|--help)
+      usage
+      exit 0
+      ;;
+    *)
+      echo "agent-isolation: unknown argument: $1" >&2
+      usage
+      exit 2
+      ;;
+  esac
+done
+[ -z "${NO_COLOR:-}" ] || plain=1
+
+declared_has() {
+  local x
+  for x in ${declared[@]+"${declared[@]}"}; do
+    [ "$x" = "$1" ] && return 0
+  done
+  return 1
+}
+
+layers=()
+
+# An sbx microVM. A VM that is already an sbx sandbox is not listed twice.
+if [ "${IS_SANDBOX:-}" = 1 ] || declared_has microvm; then
+  layers+=(microvm)
+else
+  vm=none
+  if command -v systemd-detect-virt >/dev/null 2>&1; then
+    vm=$(systemd-detect-virt --vm 2>/dev/null) || vm=none
+  fi
+  if { [ -n "$vm" ] && [ "$vm" != none ]; } || declared_has vm; then
+    layers+=(vm)
+  fi
+fi
+
+# A container. Only named container types count: inside bubblewrap, which the
+# agents' native sandboxes use, systemd-detect-virt says "container-other".
+container=
+if command -v systemd-detect-virt >/dev/null 2>&1; then
+  ctype=$(systemd-detect-virt --container 2>/dev/null) || ctype=none
+  case $ctype in
+    docker|podman|lxc|lxc-libvirt|systemd-nspawn|rkt|openvz|proot|pouch) container=1 ;;
+  esac
+elif [ -e /.dockerenv ] || [ -e /run/.containerenv ]; then
+  container=1
+fi
+if [ -n "$container" ] || declared_has container; then
+  layers+=(container)
+fi
+
+# nono sets NONO_CAP_FILE for everything it starts.
+under_nono=
+if [ -n "${NONO_CAP_FILE:-}" ] || declared_has nono; then
+  under_nono=1
+  layers+=(nono)
+fi
+
+# The agent's own sandbox. Not counted under nono, which turns it off.
+native=
+if [ -z "$under_nono" ]; then
+  case $agent in
+    claude)
+      f=${CLAUDE_CONFIG_DIR:-$HOME/.claude}/settings.json
+      if [ -r "$f" ]; then
+        if command -v jq >/dev/null 2>&1; then
+          jq -e '.sandbox.enabled == true' "$f" >/dev/null 2>&1 && native=1
+        else
+          grep -A3 '"sandbox"' "$f" 2>/dev/null | grep -q '"enabled": *true' && native=1
+        fi
+      fi
+      ;;
+    codex)
+      f=${CODEX_HOME:-$HOME/.codex}/config.toml
+      if [ -r "$f" ]; then
+        # Only a top-level sandbox_mode counts, so stop at the first [table].
+        mode=$(sed -n '/^\[/q;s/^sandbox_mode[[:space:]]*=[[:space:]]*"\([^"]*\)".*/\1/p' "$f" | head -n1)
+        case $mode in
+          workspace-write|read-only) native=1 ;;
+        esac
+      fi
+      ;;
+  esac
+fi
+if [ -n "$native" ] || declared_has native; then
+  layers+=(native)
+fi
+
+if [ ${#layers[@]} -eq 0 ]; then
+  label=NONE
+  strongest=NONE
+else
+  label=$(IFS=+; echo "${layers[*]}")
+  strongest=${layers[0]}
+fi
+
+if [ -n "$plain" ]; then
+  echo "$label"
+  exit 0
+fi
+
+case $strongest in
+  microvm|vm) code='32' ;;
+  container) code='33' ;;
+  nono) code='38;5;208' ;;
+  native) code='31' ;;
+  NONE) code='1;97;41'; label=" NONE " ;;
+esac
+printf '\033[%sm%s\033[0m\n' "$code" "$label"

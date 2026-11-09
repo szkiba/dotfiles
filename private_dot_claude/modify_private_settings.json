@@ -11,6 +11,8 @@
 #
 # The nono shortcut (nono claude) turns the sandbox off again with --settings,
 # because bubblewrap cannot run inside nono.
+#
+# statusLine shows which isolation layer Claude runs in (~/.ai/bin/agent-isolation).
 if ! command -v jq >/dev/null 2>&1; then
   echo "modify settings.json: jq is required to set Claude's sandbox keys" >&2
   exit 1
@@ -23,4 +25,5 @@ printf '%s\n' "$in" | jq '
   | .sandbox.failIfUnavailable = true
   | .sandbox.network.allowAllUnixSockets = true
   | .sandbox.network.allowedDomains = (((.sandbox.network.allowedDomains // []) + ["*"]) | unique)
+  | .statusLine = {"type": "command", "command": "bash ~/.ai/bin/agent-isolation --agent claude"}
 '
