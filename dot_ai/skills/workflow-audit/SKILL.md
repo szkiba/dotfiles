@@ -28,7 +28,7 @@ Settle three things with the user, asking only for what is missing: the repo, wh
 
 ## Run the checks
 
-The script is `~/.ai/skills/workflow-audit/scripts/audit.sh` and has two checking modes, `repo` and `transcripts`, which print one finding per line as `FAIL`, `WARN` or `INFO`, then a `checked:` line that says what was covered. The `context` command below helps judge a finding. A fourth mode, `stats`, prints counts for the kaizen skill and no findings.
+The script is `~/.ai/skills/workflow-audit/scripts/audit.sh` and has three checking modes, `repo`, `transcripts` and `publish`, which print one finding per line as `FAIL`, `WARN` or `INFO`, then a `checked:` line that says what was covered. The `context` command below helps judge a finding. A fourth mode, `stats`, prints counts for the kaizen skill and no findings.
 
 Repo state, run where the work was done, because `.ai/maker-checker/` and the jj snapshots exist only in that clone. For a sandbox, feed the script over stdin, which works without the skill being mounted there. The login shell prints a banner first, ignore it:
 
@@ -42,6 +42,12 @@ Transcripts. On the host, point `--cwd` at the repo. For a sandbox, copy its ses
     sh ~/.ai/skills/workflow-audit/scripts/audit.sh transcripts --cwd <path in sandbox> [--since YYYY-MM-DD] [--include-active] "$stage"
 
 To keep the evidence of a sandbox, or to read it after the sandbox is gone, use the archive instead of copying by hand. From the repo on the host, `sh ~/.ai/skills/workflow-audit/scripts/archive.sh <sandbox>` copies the session transcripts, the maker-checker review files, the agent's memory notes and a repo mode report to `~/.local/state/agent-archive/<repo path with / as ->/<sandbox>-<id>/`, and prints only paths and counts. github-publisher runs it every time. Pass that folder's `claude` and `codex` subfolders to the transcripts mode, with `--cwd` set to the repo path. Archives older than 8 weeks are deleted. The archive is outside the repo on purpose, because a sandbox can read the host repo, ignored files included.
+
+Publishing. `publish.sh` of the github-publisher skill keeps a log of what it posted and what it left alone in `~/.local/state/github-publish/log.jsonl`, on the host and outside the repo, so a sandbox cannot read or change it. Read it with:
+
+    sh ~/.ai/skills/workflow-audit/scripts/audit.sh publish [--cwd <repo path>] [--since YYYY-MM-DD] [--until YYYY-MM-DD]
+
+It takes the runs that started in a repo under `--cwd` (default the current directory) in the last 7 days. It is the evidence for publishing that a run in the user's own terminal leaves, because that run has no transcript.
 
 Sessions written in the last two minutes are skipped, so an audit of work that is still going on would miss its live session. Add `--include-active` for that, and a `--since` of today so older sessions do not bury it. A live session is still being written, so a finding in it can change a minute later. The copy in `$stage` holds raw transcripts, so delete it when you are done.
 
@@ -63,6 +69,8 @@ Decide for each one: confirmed, explained (the user approved it in the prompt ju
 - `skill-skipped`: the prompt asked for a skill and the session shows no sign of it. Check that the user was not only talking about the skill.
 - `chat-mode`: a `chat:` prompt allows reading only. A file edit outside `/tmp` is a FAIL. A command that may change things is a WARN.
 - `signing-bypass`: signing turned off. Fine in a throwaway clone, a problem in the real repo.
+- `publish-partial` (FAIL): publish.sh pushed or created something and a later step failed. Look at the PR and the branch on GitHub. `publish-failed` is a post or a branch that did not go out, and nothing was written for the second kind. `publish-unfinished`: a run with no end, interrupted or crashed.
+- `publish-check-failed`: a draft branch failed the checks at publish time (signatures, messages, base, remote), which points at the commit-curator step. `publish-refused`: a request file with control characters or hidden direction marks, written by a sandbox agent, so look at how that draft came about. `publish-flagged` (INFO): a post that carried a flag (attribution line, @mention, secret-like text, other repo) and was approved one by one. Judge it by the record's approval, there is no prompt text to read.
 - `commit-approval`, `outbound-write`: a `git commit`, a push or a GitHub write. Judge by the prompt right before it: was the exact text shown and approved? In a Copilot session an approval given through its ask_user tool shows up as `approval: <choice>`. It is only INFO when the session used github-publisher.
 
 ## Report
@@ -70,6 +78,8 @@ Decide for each one: confirmed, explained (the user approved it in the prompt ju
 Keep it short and plain. Start with what was covered, from the `checked:` line, because "nothing found" means something only with coverage. Then the confirmed problems first, each with its evidence (a commit hash, or a session and time), then what you found explained, then what could not be checked. Say plainly when nothing turned up, and that this covers only the listed checks. When a problem comes from an unclear or conflicting rule, say which rule and suggest the fix. Do not make it.
 
 ## What it cannot see
+
+The publish log is the script's own account of what it did, not an independent witness, and it holds nothing about a write that an agent made itself. Those show up in the transcripts check as `outbound-write`. With publish.sh in use, such a write is outside the workflow, so treat it as a lead even when the session mentions github-publisher.
 
 The script cannot read intent, so approval is always your call. In chat mode it does not see shell redirects, `rm` or `cp`. It does not read text inside files that were written with Edit or Write. Commands that build a throwaway repo (`git init`, `git clone`, `mktemp`, `GIT_CONFIG_GLOBAL`) are not checked for commits and signing. The Codex and Copilot parsers are best effort. Codex was tried on a few small sessions. Copilot was tried on two github-publisher sessions that used only the bash, skill and ask_user tools, so its file edit tool names are a guess. If the user wants a deep audit of one skill, read that session against the steps in its SKILL.md yourself. The script covers only the cheap checks.
 

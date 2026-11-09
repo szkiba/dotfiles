@@ -5,6 +5,7 @@
 #   audit.sh transcripts [--since YYYY-MM-DD] [--cwd PREFIX] [--include-active] [dir-or-file...]
 #   audit.sh context [--root DIR]... SESSION-ID-PREFIX FROM [TO]
 #   audit.sh stats [--since YYYY-MM-DD] [--until YYYY-MM-DD] [--cwd PREFIX] [--include-active] [--skills DIR] [dir-or-file...]
+#   audit.sh publish [--since YYYY-MM-DD] [--until YYYY-MM-DD] [--cwd PREFIX] [--log FILE]
 #
 # repo: looks at the git and jj state of the repo at path (default: here).
 # Run it where the work was done, for a sandbox with `sbx exec`. It never
@@ -33,6 +34,14 @@
 # --cwd to / (all sessions). --until DATE stops at sessions last written before
 # it, which allows a before and after comparison. --skills DIR is the folder
 # of installed skills (default ~/.ai/skills). Codex files give no error counts.
+# It ends with a "publishing:" block of counts from the publish log, see below.
+#
+# publish: reads the log that publish.sh keeps of what it posted and what it left
+# alone (default ~/.local/state/github-publish/log.jsonl, or $PUBLISH_LOG_DIR, or
+# --log FILE). It takes the runs that started in a repo under --cwd (default the
+# current directory), since --since (default 7 days ago) and before --until. Run
+# it on the host, because the log is not in the sandbox. A write to GitHub that an
+# agent made itself does not appear in this log, only in the transcripts.
 #
 # Output: one finding per line, "FAIL|WARN|INFO <check>: <text>", then a
 # "checked:" line that says what was covered, then a summary. A finding is
@@ -605,7 +614,123 @@ $JQ_PROG" "$f" >"$tmp/one" 2>"$tmp/jq.err"; then
 	report "$nread sessions ($nclaude claude, $ncodex codex, $ncopilot copilot) with working directory under $prefix, written since $since; $nprompts prompts, $ntools tool calls"
 }
 
+# ------------------------------------------------------------ publish mode
+
+publish_log() { echo "${PUBLISH_LOG_DIR:-$HOME/.local/state/github-publish}/log.jsonl"; }
+
+# The events of the runs that started in a repo under $prefix, in the window.
+JQ_PUBSEL=$(
+	cat <<'EOF'
+[inputs | fromjson?] as $L
+| ($L | map(select(.action == "run-start" and ((.root // "") | startswith($prefix))
+    and (.ts[0:10] >= $since) and ($upto == "" or .ts[0:10] < $upto)) | .run)) as $runs
+| $L[] | select(.run as $r | $runs | any(. == $r))
+EOF
+)
+
+# One finding per line, as level, check and text. The texts come from gh and from
+# request files, so control characters are blanked and the length is capped.
+JQ_PUBFIND=$(
+	cat <<'EOF'
+def tx: (. // "") | tostring | snip(200);
+def at: .ts[0:16];
+. as $E
+| ( $E[] | select(.action == "branch" and .result == "partial")
+    | ["FAIL", "publish-partial", "\(at) branch \(.branch | tx) in \(.repo | tx): something was written and a later step failed (pushed \(.pushed), PR \(.pr_url | tx)), look at GitHub"] | @tsv ),
+  ( $E[] | select(.action == "branch" and .result != "ok" and .result != "partial")
+    | ["WARN", "publish-failed", "\(at) branch \(.branch | tx) in \(.repo | tx) was not published (\(.result | tx))"] | @tsv ),
+  ( $E[] | select(.action == "post-failed")
+    | ["WARN", "publish-failed", "\(at) \(.kind | tx) post failed in \(.repo | tx) (\(.thread // .target | tx)): \(.error | tx)"] | @tsv ),
+  ( $E[] | select(.action == "request-skipped" and ((.reason // "") | test("control characters")))
+    | ["WARN", "publish-refused", "\(at) \(.request | tx) was refused for control characters or hidden direction marks, so a draft was written with hidden text"] | @tsv ),
+  ( $E[] | select(.action == "check-failed")
+    | ["WARN", "publish-check-failed", "\(at) branch \(.branch | tx) in \(.repo | tx) failed the check: \((.checks // []) | if length == 0 then "could not run" else join(", ") end) (\(.detail | tx))"] | @tsv ),
+  ( $E[] | select((.action | IN("branch", "reply", "comment", "issue")) and ((.flags // []) | length) > 0)
+    | ["INFO", "publish-flagged", "\(at) \(.action) in \(.repo | tx) (request \(.request | tx)) was posted with flags \(.flags | join(", ")), approval: \(.approval | tx)"] | @tsv ),
+  ( ($E | map(select(.action == "run-end") | .run)) as $ended
+    | $E[] | select(.action == "run-start" and (.run as $r | ($ended | any(. == $r)) | not))
+    | ["INFO", "publish-unfinished", "\(at) run \(.run | tx) has no run-end, it was interrupted or crashed"] | @tsv )
+EOF
+)
+
+# Counts, as lines of text, for stats and for the coverage line.
+JQ_PUBSTATS=$(
+	cat <<'EOF'
+def n(f): [ .[] | select(f) ] | length;
+def by(f; g): [ .[] | select(f) | g ] | group_by(.) | map("\(.[0])=\(length)") | join(" ") | if . == "" then "none" else . end;
+def posted: (.action | IN("reply", "comment", "issue")) or (.action == "branch" and .result == "ok");
+n(.action == "run-start") as $runs
+| "  runs: \($runs), without a run-end: \($runs - n(.action == "run-end"))",
+  "  posted: branches=\(n(.action == "branch" and .result == "ok")) replies=\(n(.action == "reply")) comments=\(n(.action == "comment")) issues=\(n(.action == "issue")), approval: \(by(posted; .approval // "?")), with flags: \(n(posted and ((.flags // []) | length) > 0))",
+  "  replies dropped before the prompt: \(by(.action == "reply-dropped"; .reason))",
+  "  checks failed: \(n(.action == "check-failed")) (\(by(.action == "check-failed"; (.checks // []) | if length == 0 then "could-not-run" else .[] end)))",
+  "  not posted: branch-stopped=\(n(.action == "branch-stopped")) already-published=\(n(.action == "branch-already-published")) request-skipped=\(n(.action == "request-skipped")) declined=\(n(.action == "declined")) skipped-for-good=\(n(.action == "skipped-for-good")) left-unpublished=\(n(.action == "left-unpublished")) quit=\(n(.action == "quit")) post-failed=\(n(.action == "post-failed"))"
+EOF
+)
+
+# pub_select: the events of the window into $tmp/pub.jsonl. Needs $prefix, $since
+# and $upto. Returns 1 when there is no log or it cannot be read.
+pub_select() {
+	: >"$tmp/pub.jsonl"
+	[ -f "$publog" ] || return 1
+	jq -Rnc --arg prefix "$prefix" --arg since "$since" --arg upto "${upto:-}" "$JQ_PUBSEL" "$publog" >"$tmp/pub.jsonl" 2>"$tmp/jq.err" || {
+		finding WARN unreadable "could not read $publog: $(head -n 1 "$tmp/jq.err")"
+		return 1
+	}
+}
+
+cmd_publish() {
+	since=$(date -d '7 days ago' +%F 2>/dev/null) || die "date -d is not available here, pass --since"
+	upto=
+	prefix=$PWD
+	publog=$(publish_log)
+	while [ $# -gt 0 ]; do
+		case $1 in
+		--since) [ $# -ge 2 ] || usage; since=$2; shift 2 ;;
+		--until) [ $# -ge 2 ] || usage; upto=$2; shift 2 ;;
+		--cwd) [ $# -ge 2 ] || usage; prefix=$2; shift 2 ;;
+		--log) [ $# -ge 2 ] || usage; publog=$2; shift 2 ;;
+		*) usage ;;
+		esac
+	done
+	for d in "$since" "$upto"; do
+		case $d in "" | [0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]) ;; *) die "a date looks like 2026-11-05" ;; esac
+	done
+	command -v jq >/dev/null 2>&1 || die "jq is needed for the publish check"
+	if [ ! -f "$publog" ]; then
+		finding INFO no-publish-log "there is no publish log at $publog, so nothing was posted with publish.sh on this machine, or this is not the host"
+		report "no publish log"
+		return
+	fi
+	if pub_select; then
+		if [ -s "$tmp/pub.jsonl" ]; then
+			jq -sr "$JQ_DEFS
+$JQ_PUBFIND" "$tmp/pub.jsonl" >>"$out" 2>"$tmp/jq.err" || finding WARN unreadable "could not check the publish log: $(head -n 1 "$tmp/jq.err")"
+		else
+			finding INFO no-publish-runs "no publish run started in a repo under $prefix since $since, check --cwd and --since"
+		fi
+	fi
+	nruns=$(jq -r 'select(.action == "run-start") | .run' "$tmp/pub.jsonl" 2>/dev/null | wc -l)
+	nposted=$(jq -r 'select((.action | IN("reply", "comment", "issue")) or (.action == "branch" and .result == "ok")) | .action' "$tmp/pub.jsonl" 2>/dev/null | wc -l)
+	report "$nruns publish run(s) in repos under $prefix since $since in $publog, $nposted post(s). It holds only what publish.sh did: a GitHub write by an agent itself is not here, see the transcripts check"
+}
+
 # -------------------------------------------------------------- stats mode
+
+# The publishing block of stats: counts from the publish log.
+stats_publishing() {
+	echo "publishing (the publish log, runs that started under $prefix, $window):"
+	publog=$(publish_log)
+	if [ ! -f "$publog" ]; then
+		echo "  no publish log at $publog"
+	elif ! pub_select; then
+		echo "  the publish log could not be read"
+	elif [ ! -s "$tmp/pub.jsonl" ]; then
+		echo "  no publish run in the window"
+	else
+		jq -sr "$JQ_PUBSTATS" "$tmp/pub.jsonl"
+	fi
+}
 
 cmd_stats() {
 	since=$(date -d '14 days ago' +%F 2>/dev/null) || die "date -d is not available here, pass --since"
@@ -652,6 +777,7 @@ $JQ_STATS" "$f" >"$tmp/one" 2>"$tmp/jq.err"; then
 	[ -z "$upto" ] || window="$window and before $upto"
 	if [ ! -s "$tmp/sessions" ]; then
 		echo "stats: no session found with working directory under $prefix, $window"
+		stats_publishing
 		[ "$nbad" -eq 0 ] || echo "note: $nbad file(s) could not be read"
 		return 0
 	fi
@@ -699,6 +825,8 @@ $JQ_STATS" "$f" >"$tmp/one" 2>"$tmp/jq.err"; then
 	head -n 40 "$tmp/corr" | awk -F'\t' '{ printf "  %s %s [%s] \"%s\"\n", $2, $3, $4, $5 }'
 	[ "$nc" -le 40 ] || echo "  ... $((nc - 40)) more"
 
+	stats_publishing
+
 	[ "$skipped" -eq 0 ] || echo "note: $skipped session file(s) written in the last 2 minutes were skipped, use --include-active to read them"
 	[ "$nbad" -eq 0 ] || echo "note: $nbad file(s) could not be read"
 	return 0
@@ -714,6 +842,7 @@ repo) cmd_repo "$@" ;;
 transcripts) cmd_transcripts "$@" ;;
 context) cmd_context "$@" ;;
 stats) cmd_stats "$@" ;;
+publish) cmd_publish "$@" ;;
 -h | --help | help) usage ;;
 *) usage ;;
 esac
