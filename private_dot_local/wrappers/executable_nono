@@ -11,6 +11,9 @@
 #
 #   nono run|shell|wrap ...
 #     Pass --allow-cwd so the working directory is shared without the prompt.
+#
+# Both refuse, with a short message, to share a folder that holds your home
+# directory (see refuse_home).
 
 # Drop this folder from PATH, or `exec nono` would find this wrapper again and
 # loop.
@@ -22,14 +25,35 @@ PATH=${p%:}
 # own rule: it wants an explicit --allow-cwd there. The access level still
 # comes from the profile (workdir.access).
 cwd=()
+share=
 if [ -t 0 ] && [ -t 1 ]; then
   cwd=(--allow-cwd)
-  # nono rejects the flag twice, so leave it out if it was typed already.
-  for a in "$@"; do
-    [ "$a" = -- ] && break
-    [ "$a" = --allow-cwd ] && cwd=()
-  done
+  share=1
 fi
+# nono rejects the flag twice, so leave it out if it was typed already.
+for a in "$@"; do
+  [ "$a" = -- ] && break
+  if [ "$a" = --allow-cwd ]; then
+    cwd=()
+    share=1
+  fi
+done
+
+# nono shares the working folder with the agent. If that folder holds your home
+# directory (~ itself, or /home, or /), sharing it would cover ~/.ssh, ~/.aws
+# and the other protected paths, and nono refuses with a very long error. Say it
+# in two lines instead.
+refuse_home() {
+  [ -n "$share" ] || return 0
+  local here home
+  here=$(pwd -P)
+  home=$(cd "$HOME" 2>/dev/null && pwd -P) || return 0
+  if [ "$here" = / ] || [[ "$home/" == "$here"/* ]]; then
+    echo "nono: $here holds your home directory, so sharing it would expose ~/.ssh, ~/.aws and other protected paths." >&2
+    echo "nono: start it from a project folder instead." >&2
+    exit 1
+  fi
+}
 
 case $1 in
   claude|codex|copilot)
@@ -65,11 +89,18 @@ case $1 in
       [ -n "$have_approval" ] || defaults+=(--ask-for-approval on-request)
       set -- "${defaults[@]}" "$@"
     fi
+    refuse_home
     exec nono run "${cwd[@]}" --profile "$agent" -- "$agent" "$@"
     ;;
   run|shell|wrap)
     sub=$1
     shift
+    # nono's own -h/--help needs no folder, so let it through.
+    for a in "$@"; do
+      [ "$a" = -- ] && break
+      case $a in -h|--help) share= ;; esac
+    done
+    refuse_home
     exec nono "$sub" "${cwd[@]}" "$@"
     ;;
 esac
