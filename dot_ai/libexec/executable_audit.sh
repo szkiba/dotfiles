@@ -453,7 +453,13 @@ def epoch: sub("\\.[0-9]+"; "") | (try fromdateiso8601 catch null);
       | ([ (if ($byre | any(. == $p.ts)) then "words" else empty end),
            (if ($byint | any(. == $p.ts)) then "after-interrupt" else empty end) ]) as $tags
       | select(($tags | length) > 0)
-      | ["#corr", $s, $p.ts[0:16], ($tags | join("+")), ($p.text | snip(160))] | @tsv )
+      | ["#corr", $s, $p.ts[0:16], ($tags | join("+")), ($p.text | snip(160))] | @tsv ),
+    # The reason the user typed when rejecting a plan, an edit or a command.
+    ( $L[] | select(.type == "user" and (.timestamp | type) == "string" and .timestamp >= $since) | .timestamp as $t
+      | blocks[] | select(.type == "tool_result" and .is_error == true)
+      | (.content | if type == "array" then (map(if type == "object" then (.text // "") else "" end) | join(" ")) elif type == "string" then . else "" end)
+      | select(test("the user said:"))
+      | ["#corr", $s, $t[0:16], "rejected", (sub("(?s)^.*the user said:\\s*"; "") | snip(160))] | @tsv )
 EOF
 )
 
