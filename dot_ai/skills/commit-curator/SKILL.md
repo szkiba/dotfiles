@@ -38,7 +38,7 @@ Print the plan as normal text before changing anything, one block per commit wit
 
 1. Mark the original chain with `jj bookmark create snap/<topic>-raw -r @-`. Then make a restore point by noting the operation id from `jj op log --no-graph -n 1 -T 'id.short(12)'`.
 2. Run `jj new snap/<topic>`. If that commit is empty and has no description, which happens when jj was set up in a repo that already had commits, run `jj new 'parents(snap/<topic>)'` instead, so the empty commit does not end up under the curated commits. The ranges `snap/<topic>..@-` below still select exactly the curated commits.
-3. For each commit in order, run `jj restore --from <rev> -- <paths>` and then `jj commit -m "<subject>" -m "<body>"`. The `<rev>` is `snap/<topic>-raw` unless a file must show the state it had at an earlier milestone, in which case use that milestone's revision. A later commit then brings the file to its final state.
+3. For each commit in order, run `jj restore --from <rev> -- <paths>` and then `jj commit --message="<subject>" --message="<body>"`, with `=` so a body that starts with `-` is not read as an option. The `<rev>` is `snap/<topic>-raw` unless a file must show the state it had at an earlier milestone, in which case use that milestone's revision. A later commit then brings the file to its final state.
 4. After the last commit of each layer, or of the series, run `jj bookmark create <branch> -r @-`.
 5. Check that nothing was lost or added: `jj diff --from snap/<topic>-raw --to @-` must print nothing, because the final state is what was reviewed. If the diff is not empty, the usual cause is a wrong group, so fix it. If a difference is wanted or unavoidable, such as a conflict you had to resolve or a change a layer needs to build, show the diff to the user and say that it was never reviewed.
 
@@ -62,11 +62,11 @@ Signing is the last step. jj commits have an empty author when jj has no identit
 
     key=$(sh -c "$(git config gpg.ssh.defaultKeyCommand)") && jj sign -r 'snap/<topic>..@-' --key "${key#key::}"
 
-The signing backend and the allowed signers file come from `~/.config/jj/config.toml`. The key is the one git would use. The key command prints it as `key::<public key>`. If `gpg.ssh.defaultKeyCommand` is not set, use `git config user.signingkey` instead.
+The backend and the allowed signers file come from `~/.config/jj/config.toml`, and the key is the one git would use, printed by the key command as `key::<public key>`. Without `gpg.ssh.defaultKeyCommand`, use `git config user.signingkey`.
 
 Then check `git log --format='%h %G? %an <%ae> %s' snap/<topic>..HEAD`. Every line needs G or U (U only means the key is not in the allowed signers file). N means unsigned. Run the diff from step 5 again, which must still print nothing, because signing must not touch the content.
 
-If signing fails, jj changes nothing. Tell the user what it said and stop. Do not skip or bypass signing on your own. If the user then tells you to skip it, leave the commits unsigned and say so in the report.
+The key is a security key, and every signature needs a touch within a few seconds. Say so in the approval question, and sign right after the yes, not later. If signing fails with `agent refused operation`, the key was most likely not touched. jj changes nothing: tell the user what it said, stop, and wait until they say they are ready. Do not skip or bypass signing on your own. If the user then tells you to skip it, leave the commits unsigned and say so in the report.
 
 ## Publish request
 

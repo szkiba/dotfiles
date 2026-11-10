@@ -45,7 +45,7 @@ At the end of each milestone:
 
 1. Run `jj st`. If there are no changes, skip the snapshot, because `jj commit` would create an empty commit.
 2. Check the listed files. jj saves every file that is not ignored, so credentials, build output and other files that do not belong must be ignored or removed first.
-3. Run `jj commit -m "<subject>" -m "<body>"`, with a final `-m` for the trailers when they apply, see below. This saves the working copy and starts a new empty one on top.
+3. Run `jj commit --message="<subject>" --message="<body>"`, with a final `--message=` for the trailers when they apply, see below. Write it with `=`, so a body that starts with `-` is not read as an option. This saves the working copy and starts a new empty one on top.
 
 ## The message
 

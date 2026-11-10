@@ -14,7 +14,7 @@ A file starts with a header of `Key: value` lines. Each item follows a line with
 
 ## The three kinds
 
-`branches`: the branches to push and the pull requests to open. The header has `Repo: owner/name`. Write one item per branch, bottom of the stack first. An item has `Branch`, `Base`, `Title`, optionally `Draft: yes`, and the PR description as its text. For the second and later branches of a stack, `Base` is the name of the previous branch. An item with `PR: <n>` is a branch whose PR already exists: it is only pushed, and it needs no title or description.
+`branches`: the branches to push and the pull requests to open. The header has `Repo: owner/name`. Write one item per branch, bottom of the stack first. An item has `Branch`, `Base`, `Title`, optionally `Draft: yes`, and the PR description as its text. For the second and later branches of a stack, `Base` is the name of the previous branch. An item with `PR: <n>` is a branch whose PR already exists: it is only pushed, and it needs no title or description, but it still needs `Base`.
 
 `replies`: answers to review threads. The header has `Repo` and `Target: pr <n>`. Write one item per thread, with `Thread` (the GraphQL id), `Comment` (the REST id of its first comment), `Last` (the REST id of the newest comment you saw in the thread), `Verdict` (a word such as fixed or declined), `Resolve: yes` or `no`, and the reply as its text. Use `Resolve: no` unless the user asked you to resolve the thread. If the thread got a newer comment than `Last`, the reply is dropped, so write the draft when you have read the whole thread.
 

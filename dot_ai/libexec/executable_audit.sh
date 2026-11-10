@@ -406,7 +406,7 @@ JQ_STATS=$(
 def corr: "(?i)(?:^\\s*(?:no|nope|nah|stop|wait|hold on|don.?t|do not|never|wrong|not that|not what|that.?s (?:not|wrong)|this is wrong|i said|i asked|i told|i meant|i already|why did you|why are you|why do you|why would you|you (?:should|shouldn.?t|did not|didn.?t|forgot|missed|ignored|keep)|instead|revert|undo|actually|incorrect|again)\\b|\\b(?:as i said|i already (?:told|said|asked)|i didn.?t ask|not what i (?:asked|wanted|meant)|you forgot|you missed|you ignored|that.?s not what|still (?:not|wrong|fails|failing|broken)|redo|do it again|try again|are you (?:working|there|stuck)|did you (?:hang|freeze)))";
 def denied: "(?i)permission[^.]{0,60}denied|want to proceed|tool use was rejected|denied by the";
 def cresults: select(.type == "user") | blocks[] | select(.type == "tool_result")
-  | {err: (.is_error == true),
+  | {err: (.is_error == true), id: .tool_use_id,
      text: (.content | if type == "array" then (map(if type == "object" then (.text // "") else "" end) | join(" ")) elif type == "string" then . else "" end)};
 def epoch: sub("\\.[0-9]+"; "") | (try fromdateiso8601 catch null);
 
@@ -427,9 +427,11 @@ def epoch: sub("\\.[0-9]+"; "") | (try fromdateiso8601 catch null);
   | (if $agent == "claude" then
        [ $L[] | select(.type == "user") | select(any(blocks[]; (.type == "text") and ((.text // "") | test("^\\[Request interrupted")))) | .timestamp ]
      else [] end) as $intts
+  # Sending a plan or a question back is how the user steers, not a denied permission.
+  | ([ $L[] | select(.type == "assistant") | blocks[] | select(.type == "tool_use" and (.name == "ExitPlanMode" or .name == "AskUserQuestion")) | .id ]) as $plan
   | (if $agent == "claude" then
        { err: ([ $L[] | cresults | select(.err and ((.text | test(denied)) | not)) ] | length),
-         den: ([ $L[] | cresults | select(.err and (.text | test(denied))) ] | length),
+         den: ([ $L[] | cresults | select(.err and (.text | test(denied)) and ((.id as $i | $plan | index($i)) | not)) ] | length),
          int: ($intts | length),
          cmp: ([ $L[] | select(.type == "system" and .subtype == "compact_boundary") ] | length) }
      else { err: "-", den: "-", int: "-", cmp: "-" } end) as $c
@@ -456,10 +458,10 @@ def epoch: sub("\\.[0-9]+"; "") | (try fromdateiso8601 catch null);
       | ["#corr", $s, $p.ts[0:16], ($tags | join("+")), ($p.text | snip(160))] | @tsv ),
     # The reason the user typed when rejecting a plan, an edit or a command.
     ( $L[] | select(.type == "user" and (.timestamp | type) == "string" and .timestamp >= $since) | .timestamp as $t
-      | blocks[] | select(.type == "tool_result" and .is_error == true)
-      | (.content | if type == "array" then (map(if type == "object" then (.text // "") else "" end) | join(" ")) elif type == "string" then . else "" end)
-      | select(test("the user said:"))
-      | ["#corr", $s, $t[0:16], "rejected", (sub("(?s)^.*the user said:\\s*"; "") | snip(160))] | @tsv )
+      | blocks[] | select(.type == "tool_result" and .is_error == true) | . as $b
+      | ($b.content | if type == "array" then (map(if type == "object" then (.text // "") else "" end) | join(" ")) elif type == "string" then . else "" end) as $txt
+      | select($txt | test("the user said:"))
+      | ["#corr", $s, $t[0:16], (if ($plan | index($b.tool_use_id)) then "plan-feedback" else "rejected" end), ($txt | sub("(?s)^.*the user said:\\s*"; "") | snip(160))] | @tsv )
 EOF
 )
 
@@ -534,6 +536,11 @@ collect_files() {
 			echo "$f" >>"$tmp/files"
 		fi
 	done <"$tmp/all"
+	# The archive keeps a copy of a session for each sandbox run: read the biggest.
+	tab=$(printf '\t')
+	while IFS= read -r f; do printf '%s\t%s\t%s\n' "${f##*/}" "$(wc -c <"$f")" "$f"; done <"$tmp/files" |
+		sort -t "$tab" -k1,1 -k2,2nr | awk -F'\t' '!seen[$1]++ { print $3 }' >"$tmp/files.u"
+	mv "$tmp/files.u" "$tmp/files"
 }
 
 cmd_transcripts() {
