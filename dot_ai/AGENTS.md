@@ -54,7 +54,8 @@ Some repos and sandboxes have jj set up next to git in colocated mode, so both a
 - Keep jj commits local. Never run `jj git push` or push a jj bookmark without my approval, the same as any other push. In a colocated repo a bookmark is a git branch.
 - Use jj only when it is installed and the repo already has a `.jj` folder.
 - Before starting any work that changes files, record the goal: run `jj new -m "Goal: <title>" -m "<details>"`, then `jj new` and work on top of it. If the current commit is empty and has no description, as right after jj was set up in the repo, run `jj describe` with the same messages instead of the first `jj new`, so no empty commit stays below the goal. The description must start with `Goal: `, because that is how the goal commit is recognized. The empty goal commit stays as a note of what the work is for. If the work comes from a spec, task file or issue, end the description with a `Refs:` line naming it and the part covered, for example `Refs: openspec/changes/add-foo (tasks 1.1 to 1.4)`. Skip the goal for work that changes no files.
-- The real git commit that comes out of the work still follows the rules above: show me the exact message, get my approval, and sign it. The milestone-snapshots skill says how to save the milestones, and the commit-curator skill turns them into the commits I keep.
+- The real git commit that comes out of the work still follows the rules above: show me the exact message, get my approval, and sign it.
+- When you write a plan for work that changes files, end it with a Workflow section and then follow it, so I do not have to ask for the steps: the goal commit, the milestones (milestone-snapshots skill), a maker-checker round when the change is not trivial, the commits I keep through commit-curator, my approval of the exact commit message, and a `github-publish` request instead of a push. The jj steps apply only where jj is set up. If you skip a step, say so and why.
 
 # Slack messages
 
