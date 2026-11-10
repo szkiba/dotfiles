@@ -46,6 +46,16 @@ Shell variables do not survive between commands, so start every command that tou
 
 and write `"$run-request.md"`, `"$run.md"` and so on.
 
+## Self-review first
+
+On non-trivial work, if your tool has subagents, you may have a fresh one look at the work before you write the request. It is the same model as you, so it shares your blind spots. Treat it as a cleanup pass that spares the checker the obvious problems. It never replaces the checker and it does not count as a round.
+
+Brief it in a few lines: what is reviewed, what to read, the hard constraints, and that it should report at most seven findings, most important first, each with `file:line`. Tell it to only read: it must not change files, run git or jj commands that change anything, or record a goal commit. Use a read-only agent type if your tool has one.
+
+Verify each finding against the code, as in step 4. Fix what is real, drop what is not, and rerun tests and lint if you changed code. Write no request or response files for this pass, and do not mention it in the checker's request, so the checker sees the work as it stands.
+
+Skip it for trivial changes, as with the checker.
+
 ## Steps
 
 1. Check that `.ai` is ignored with `git check-ignore -q "$root/.ai"`. If it is not, stop and tell the user, because the files would show up as untracked. Otherwise run `mkdir -p "$dir"` and write `$run-request.md`. Keep it short and specific. The script already tells the checker that it is the checker, that it must not change the worktree, and that builds and tests are fine, so do not repeat that. Write it in this shape:
@@ -67,7 +77,7 @@ and write `"$run-request.md"`, `"$run.md"` and so on.
 
 4. Verify every finding against the code before acting. Sort them into confirmed, already present before the change (report it, do not fix it in this change), and wrong. Fix what is confirmed, rerun tests and lint, and tighten any test that would pass for the wrong reason. Reproduce a claimed crash or race when it is cheap, for example by removing the guard and watching the test fail, then restore it. Then write `$run-response.md`: for each finding, your verdict, one line of reasoning, and what you changed.
 
-5. Report to the user in a few lines: each finding with your verdict, what you changed, and what you left alone. After the second round, say whether significant findings remain and ask whether to run another.
+5. Report to the user in a few lines: each finding with your verdict, what you changed, and what you left alone. After the second round, say whether significant findings remain and ask whether to run another. If you ran a self-review, add one line: how many findings it raised, how many were real, and what you fixed, so the user can judge whether the step is worth its cost.
 
 6. When no further round is planned and the milestone-snapshots skill applies (big work, jj set up), take the milestone snapshot now, not before or between rounds. Add the `Review:` trailer described in that skill, with this review's topic and the rounds that ran, and say so if you changed code after the last round. A jj snapshot needs no approval, see the jj section of AGENTS.md. Git commits and pushes follow the user's global agent instructions: show the exact commit message and wait for approval, and ask before every push.
 
