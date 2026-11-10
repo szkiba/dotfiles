@@ -1,0 +1,15 @@
+#!/bin/sh
+# Zellij's copy_command: put the text on stdin into both Wayland selections.
+#
+# Zellij runs copy_command as a single process, with no shell, so it cannot pipe.
+# wl-copy alone only sets the clipboard (Ctrl+V, Ctrl+Shift+V). VTE terminals such
+# as GNOME Terminal and Terminator paste the primary selection on Shift+Insert and
+# middle click, so that one has to be set as well.
+#
+# wl-copy reads all of its input before it goes to the background, so removing the
+# temporary file right after is safe.
+tmp=$(mktemp) || exit 1
+trap 'rm -f "$tmp"' EXIT
+cat >"$tmp"
+wl-copy <"$tmp"
+wl-copy --primary <"$tmp"

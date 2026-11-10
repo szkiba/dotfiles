@@ -1,0 +1,19 @@
+#!/bin/sh
+# Zellij rewrites config.kdl itself (the settings plugin, the first-run preset
+# choice), so chezmoi does not own the file. This script keeps everything zellij
+# saved and manages one top-level setting:
+#
+#   copy_command "zellij-copy"   pipe copied text to ~/.local/bin/zellij-copy, which
+#                            sets the Wayland clipboard and primary selection.
+#                            Without a copy_command zellij uses OSC 52, which GNOME
+#                            Terminal and Terminator (both VTE) ignore, so
+#                            selections never reach the clipboard.
+#
+# An existing copy_command line is replaced in place, otherwise the line is added
+# at the end of the file. Run twice, the result is the same.
+awk '
+  BEGIN { want = "copy_command \"zellij-copy\""; done = 0 }
+  /^copy_command[ \t]/ { if (!done) { print want; done = 1 } next }
+  { print }
+  END { if (!done) print want }
+'
