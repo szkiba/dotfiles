@@ -15,14 +15,12 @@
 #       kaizen
 #         Claude Code in the kaizen profile, for the kaizen skill. It always
 #         starts in the chezmoi source folder, which is shared read-write, with
-#         read access to the transcripts, the sandbox archive and the publish log
-#         plus write access to ~/.ai and the chezmoi state, so
-#         `chezmoi apply ~/.ai` works. Apply with that path: a full apply would run
-#         the sbx skill import, which cannot work in nono, and chezmoi would then
-#         count it as done. Only this shortcut allows `chezmoi apply` and
+#         read access to the transcripts, the sandbox archive, the publish log and
+#         ~/.ai, plus write access to the chezmoi state. It cannot apply: run
+#         `chezmoi apply` in your own terminal, because the sbx skill import
+#         cannot work in nono. Only this shortcut allows
 #         `git worktree add|remove|prune` without a permission prompt, and the
-#         EnterWorktree and ExitWorktree tools. The skill still says to apply only
-#         when you ask.
+#         EnterWorktree and ExitWorktree tools.
 #
 #     Every profile can sign commits through your ssh agents and read the public
 #     part of the TPM key. To commit as the machine identity instead of yours, start
@@ -110,7 +108,7 @@ case $1 in
     if [ "$agent" = claude ]; then
       settings='{"sandbox":{"enabled":false}}'
       if [ "$profile" = kaizen ]; then
-        settings='{"sandbox":{"enabled":false},"permissions":{"allow":["Bash(chezmoi apply:*)","Bash(git worktree add:*)","Bash(git worktree remove:*)","Bash(git worktree prune:*)","EnterWorktree","ExitWorktree"]}}'
+        settings='{"sandbox":{"enabled":false},"permissions":{"allow":["Bash(git worktree add:*)","Bash(git worktree remove:*)","Bash(git worktree prune:*)","EnterWorktree","ExitWorktree"]}}'
       fi
       set -- --settings "$settings" "$@"
     fi

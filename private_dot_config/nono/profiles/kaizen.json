@@ -2,7 +2,7 @@
   "extends": "claude",
   "meta": {
     "name": "kaizen",
-    "description": "Claude Code for the kaizen skill under nono: read-only view of the agent transcripts, the sandbox archive and the publish log, plus the chezmoi source to edit, ~/.ai to apply to and ~/knowledge to write, and a GitHub token from 1Password for git over https"
+    "description": "Claude Code for the kaizen skill under nono: read-only view of the agent transcripts, the sandbox archive and the publish log, plus the chezmoi source to edit and ~/knowledge to write, and a GitHub token from 1Password for git over https"
   },
   "workdir": {
     "access": "readwrite"
@@ -15,7 +15,6 @@
       "/hub/synthetic"
     ],
     "allow": [
-      "$HOME/.ai",
       "$HOME/.config/chezmoi",
       "$HOME/knowledge"
     ]
