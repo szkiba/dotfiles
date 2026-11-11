@@ -26,12 +26,6 @@ if [ -d "$HOME/.local/bin" ] ; then
     PATH="$HOME/.local/bin:$PATH"
 fi
 
-# expose GitHub token for DevContainer
-if [ -z "$GH_TOKEN" ] && gh --version >/dev/null 2>&1  ; then
-    GH_TOKEN=`gh auth token`
-    export GH_TOKEN
-fi
-
 if [ -z "$VAGRANT_DEFAULT_PROVIDER" ] ; then
   VAGRANT_DEFAULT_PROVIDER="libvirt"
   export VAGRANT_DEFAULT_PROVIDER

@@ -2,7 +2,7 @@
   "extends": "claude",
   "meta": {
     "name": "kaizen",
-    "description": "Claude Code for the kaizen skill under nono: read-only view of the agent transcripts, the sandbox archive and the publish log, plus the chezmoi source to edit and ~/knowledge to write, and a GitHub token from 1Password for git over https"
+    "description": "Claude Code for the kaizen skill under nono: read-only view of the agent transcripts, the sandbox archive and the publish log, plus the chezmoi source to edit and ~/knowledge to write, and git over https to github.com, with the token from 1Password injected by the nono proxy so the sandbox only sees a placeholder"
   },
   "workdir": {
     "access": "readwrite"
@@ -19,8 +19,16 @@
       "$HOME/knowledge"
     ]
   },
-  "env_credentials": {
-    "op://GitHub/cli/token": "GH_TOKEN"
+  "network": {
+    "credentials": ["github"],
+    "custom_credentials": {
+      "github": {
+        "upstream": "https://github.com",
+        "credential_key": "op://GitHub/cli/token",
+        "env_var": "GH_TOKEN",
+        "inject_mode": "basic_auth"
+      }
+    }
   },
   "environment": {
     "set_vars": {
