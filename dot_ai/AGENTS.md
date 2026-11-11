@@ -45,6 +45,7 @@ If `~/knowledge` exists, it holds notes saved from earlier sessions: one folder 
 - Never make any GitHub change using the `gh` CLI or the GitHub REST API without my approval first. This covers commits, pushes, PRs, issues, comments, labels, and any other write action.
 - When asking for approval, propose a scope that fits the situation (just this action, this session, this repo, this workspace, etc.) and let me pick or change it.
 - Git commit signing is always required, never optional. If signing fails for any reason, do not skip or bypass it. Stop and ask me for help.
+- If GitHub says a repository is not found, it may be private or internal and the token cannot see it. If the read-only GitHub connector (Grafana GH Enterprise RO MCP) is available, use it to read the repo. Never use a connector with write tools for GitHub, such as Grafana Knowledge Cowork.
 
 # Jujutsu (jj)
 
