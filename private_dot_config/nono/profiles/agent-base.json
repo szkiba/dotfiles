@@ -41,6 +41,20 @@
     ]
   },
   "network": {
+    "credentials": ["github-api"],
+    "custom_credentials": {
+      "github-api": {
+        "upstream": "https://api.github.com",
+        "credential_key": "op://GitHub/szkiba/token",
+        "env_var": "GH_TOKEN",
+        "inject_mode": "header",
+        "inject_header": "Authorization",
+        "credential_format": "token {}",
+        "endpoint_rules": [
+          { "method": "GET", "path": "/**" }
+        ]
+      }
+    },
     "allow_domain": [
       "github.com",
       "api.github.com",
