@@ -257,6 +257,7 @@ def cevents:
        text: ( if .name == "Bash" then (.input.command // "")
                elif (.name | IN("Edit", "Write", "MultiEdit", "NotebookEdit")) then (.input.file_path // .input.notebook_path // "")
                elif .name == "Skill" then (.input.skill // "")
+               elif .name == "ExitPlanMode" then ((.input.plan // "") | tostring | .[0:60000])
                else ((.input // {}) | tojson | .[0:20000]) end )}
   end;
 
@@ -353,6 +354,15 @@ JQ_PROG=$(
           (.kind == "tool" and ((.name == "Skill" and (.text | test($t.skill))) or (.text | test($t.used))))
           or (.kind == "prompt" and (.text | test("^/" + $t.skill))))) | not)
     | ["WARN", "skill-skipped", "\(where($h)): the prompt asks for \($t.skill) (\"\($h.text | snip(70))\") but the session shows no sign of it"] | @tsv ),
+
+  # AGENTS.md (Plans, since 2026-11-10): the plan of work that changes files ends with a Workflow section.
+  # Only the last plan of a Claude session counts, because earlier ones are drafts.
+  ( select($agent == "claude")
+    | [ $E[] | select(.value.kind == "tool" and .value.name == "ExitPlanMode" and .value.ts >= "2026-11-10T09:16") ] as $plans
+    | select(($plans | length) > 0)
+    | $plans[-1].value as $p
+    | select(($p.text | test("(?mi)^#+[ \\t]*workflow")) | not)
+    | ["WARN", "plan-no-workflow", "\(where($p)): the last plan of the session has no Workflow section"] | @tsv ),
 
   # A chat: prompt only allows reading, for that one message.
   ( ($E | map(select(.value.kind == "prompt")) ) as $PR
