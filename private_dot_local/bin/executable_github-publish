@@ -3,7 +3,7 @@
 # your own terminal. No agent is involved: you read the exact texts and answer the
 # prompts.
 #
-#   github-publish [--check] [--no-prepare] [--remote <remote>] [--head-owner <owner>] [<sandbox-remote>]
+#   github-publish [--check] [--no-prepare] [--ssh] [--remote <remote>] [--head-owner <owner>] [-h|--help] [<sandbox-remote>]
 #
 # Run it from the repo on the host, in a terminal that is not inside nono or a
 # sandbox, so that gh (with its 1Password login), git and ssh all work.
@@ -24,6 +24,9 @@
 #
 # --check stops after step 5's plan and posts nothing. --remote is the remote to
 # push to (default origin) and --head-owner is for a fork, as for the publish-branch helper.
+# --ssh pushes over ssh to ssh.github.com:443 with the keys of your ssh agent, for
+# example when the gh token has no workflow scope. The default is https with the gh
+# token. Only the push changes: reading the remote and the PR stay on https and gh.
 #
 # Items with a FLAG (an attribution line, an @mention, something that looks like a
 # secret, or a Repo other than origin's) are never covered by "all": they are
@@ -64,6 +67,38 @@
 # PUBLISH_LOG_DIR: a folder for the log instead of the default. Both are for tests.
 set -u
 
+usage() {
+	cat <<'EOF'
+Usage: github-publish [options] [<sandbox-remote>]
+
+Publishes what the sandbox agents prepared (see ~/.ai/github-requests.md). Run it
+from the repo on the host, in a terminal outside nono and sandboxes, so that gh,
+git and ssh work. It shows the exact texts and posts only after you approve.
+
+Options:
+  --check               stop after the plan and post nothing
+  --ssh                 push over ssh to ssh.github.com:443 with the keys of your
+                        ssh agent, instead of https with the gh token (for example
+                        when the token has no workflow scope). Fetching, checks and
+                        the PR stay on https and gh
+  --no-prepare          do not copy new request files out of the sandbox, needs
+                        <sandbox-remote>
+  --remote <remote>     remote to push to (default origin)
+  --head-owner <owner>  owner of the fork that holds the branch, the PR head
+                        becomes <owner>:<branch>
+  -h, --help            show this help
+
+<sandbox-remote> is the git remote that points at the sandbox. The prepare step
+finds it, so it is needed only with --no-prepare.
+
+Exit codes: 0 ok, 1 something was stopped or failed, 2 setup problem, 3 a step
+failed after something was written (look at the PR or the repo).
+EOF
+}
+for arg in "$@"; do
+	case $arg in -h | --help) usage; exit 0 ;; esac
+done
+
 die() { echo "github-publish: $*" >&2; exit 2; }
 
 case $0 in */*) here=${0%/*} ;; *) here=. ;; esac
@@ -73,6 +108,7 @@ libexec=$(cd "$here/../libexec/github-publish" 2>/dev/null && pwd) || die "canno
 
 check=
 noprep=
+ssh=
 remote=origin
 owner=
 sandbox=
@@ -80,13 +116,14 @@ while [ $# -gt 0 ]; do
 	case $1 in
 	--check) check=1; shift ;;
 	--no-prepare) noprep=1; shift ;;
+	--ssh) ssh=1; shift ;;
 	--remote) [ $# -ge 2 ] || die "--remote needs a value"; remote=$2; shift 2 ;;
 	--head-owner) [ $# -ge 2 ] || die "--head-owner needs a value"; owner=$2; shift 2 ;;
-	-*) die "unknown option $1" ;;
+	-*) die "unknown option $1 (see --help)" ;;
 	*) break ;;
 	esac
 done
-[ $# -le 1 ] || die "usage: github-publish [--check] [--no-prepare] [--remote R] [--head-owner O] [<sandbox-remote>]"
+[ $# -le 1 ] || die "usage: github-publish [--check] [--no-prepare] [--ssh] [--remote R] [--head-owner O] [<sandbox-remote>] (see --help)"
 [ $# -eq 0 ] || sandbox=$1
 
 plain() { case $1 in "" | -* | *..* | *[!A-Za-z0-9._/+-]*) return 1 ;; esac; return 0; }
@@ -192,7 +229,7 @@ orepo=
 case $ourl in
 *github.com[:/]*) orepo=$(printf %s "$ourl" | sed -E 's#^.*github\.com[:/]##; s#\.git$##') ;;
 esac
-rec run-start --arg root "$root" --arg sandbox "${sandbox#sandbox-}" --arg push_remote "$remote" --arg origin_repo "$orepo"
+rec run-start --arg root "$root" --arg sandbox "${sandbox#sandbox-}" --arg push_remote "$remote" --arg push_via "$([ -n "$ssh" ] && echo ssh || echo https)" --arg origin_repo "$orepo"
 
 # Parser for a request file. mode=items: a header of Key: value lines, then one
 # item after each "---" line that is followed by a Key: value line. mode=single:
@@ -311,7 +348,7 @@ scan_branches() { # scan_branches <file> <request dir>
 		sha=$(git rev-parse --verify -q "refs/remotes/$sandbox/$branch^{commit}") || {
 			reqskip "$d" "no fetched commit for $branch"; break
 		}
-		out=$(sh "$libexec/publish-branch.sh" ${owner:+--head-owner "$owner"} --remote "$remote" "$sandbox" "$f" "$branch" "$sha" 2>&1 </dev/null)
+		out=$(sh "$libexec/publish-branch.sh" ${ssh:+--ssh} ${owner:+--head-owner "$owner"} --remote "$remote" "$sandbox" "$f" "$branch" "$sha" 2>&1 </dev/null)
 		rc=$?
 		printf '%s\n' "$out" | sed '/^commands, if you have to run them yourself:/,$d' | clean
 		if [ "$rc" -ne 0 ]; then
@@ -452,7 +489,7 @@ lasturl() { printf '%s\n' "$1" | tail -n 1; }
 
 do_branch() {
 	it=$1
-	out=$(sh "$libexec/publish-branch.sh" --go ${owner:+--head-owner "$owner"} --remote "$remote" "$sandbox" "$(cat "$it/reqfile")" "$(cat "$it/Branch")" "$(cat "$it/sha")" 2>&1 </dev/null)
+	out=$(sh "$libexec/publish-branch.sh" --go ${ssh:+--ssh} ${owner:+--head-owner "$owner"} --remote "$remote" "$sandbox" "$(cat "$it/reqfile")" "$(cat "$it/Branch")" "$(cat "$it/sha")" 2>&1 </dev/null)
 	rc=$?
 	printf '%s\n' "$out" | clean
 	res=$(printf '%s\n' "$out" | sed -n 's/^result: \([a-z]*\).*/\1/p' | tail -n 1)

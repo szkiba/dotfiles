@@ -3,13 +3,16 @@
 # description are read from the request file by this script, so the text the user
 # approved is the text that is posted, and nothing is retyped.
 #
-#   publish-branch.sh [--go] [--remote <remote>] [--head-owner <owner>] \
+#   publish-branch.sh [--go] [--ssh] [--remote <remote>] [--head-owner <owner>] \
 #                     <sandbox-remote> <request-file> <branch> <sha>
 #
 # <sha> is the head that check-branch.sh printed and the user approved. The
 # script stops if the fetched branch is no longer at that commit. --remote is
 # the remote to push to (default origin). --head-owner is for a fork: the PR
-# head becomes <owner>:<branch>.
+# head becomes <owner>:<branch>. --ssh pushes over ssh to ssh.github.com on port
+# 443, with the keys of the ssh agent, instead of the URL of the remote (https
+# and the gh token by default). The repo name comes from the URL of the remote.
+# Reading the remote and the PR stay on https and gh.
 #
 # Without --go nothing is written anywhere. It runs the checks it can, then
 # prints the plan, the exact title and description, and the commands to paste
@@ -41,18 +44,20 @@ stop() { echo "result: stop ($*)"; exit 1; }
 partial() { echo "result: partial ($*)"; exit 3; }
 
 go=
+ssh=
 remote=origin
 owner=
 while [ $# -gt 0 ]; do
 	case $1 in
 	--go) go=1; shift ;;
+	--ssh) ssh=1; shift ;;
 	--remote) [ $# -ge 2 ] || die "--remote needs a value"; remote=$2; shift 2 ;;
 	--head-owner) [ $# -ge 2 ] || die "--head-owner needs a value"; owner=$2; shift 2 ;;
 	-*) die "unknown option $1" ;;
 	*) break ;;
 	esac
 done
-[ $# -eq 4 ] || die "usage: publish-branch.sh [--go] [--remote R] [--head-owner O] <sandbox-remote> <request-file> <branch> <sha>"
+[ $# -eq 4 ] || die "usage: publish-branch.sh [--go] [--ssh] [--remote R] [--head-owner O] <sandbox-remote> <request-file> <branch> <sha>"
 sandbox=$1
 reqfile=$2
 branch=$3
@@ -72,6 +77,21 @@ cd "$root" || die "cannot enter $root"
 git remote get-url "$sandbox" >/dev/null 2>&1 || die "no remote named $sandbox"
 rurl=$(git remote get-url "$remote" 2>/dev/null) || die "no remote named $remote"
 shown=$(printf %s "$rurl" | sed -E 's#^([a-z+]+://)[^/@]*@#\1#')
+# What git pushes to: the remote, or with --ssh the ssh URL of the same repo.
+pushto=$remote
+if [ -n "$ssh" ]; then
+	case $rurl in
+	*github.com[:/]*) ;;
+	*) stop "--ssh needs a github.com remote, $remote is $shown" ;;
+	esac
+	slug=$(printf %s "$rurl" | sed -E 's#^.*github\.com[:/]##; s#\.git$##')
+	case $slug in
+	"" | */*/* | /* | */ | -* | *[!A-Za-z0-9._/-]*) stop "cannot read owner/name from the URL of $remote" ;;
+	*/*) ;;
+	*) stop "cannot read owner/name from the URL of $remote" ;;
+	esac
+	pushto=ssh://git@ssh.github.com:443/$slug.git
+fi
 inbox=$(cd -P -- "$root/.ai/github-publisher" 2>/dev/null && pwd -P) || die "no .ai/github-publisher in the repo"
 reqdir=$(cd -P -- "$(dirname -- "$reqfile")" 2>/dev/null && pwd -P) || die "no such folder for $reqfile"
 case ${reqfile##*/} in
@@ -208,7 +228,7 @@ treeurl() {
 
 echo "repo: $repo"
 echo "branch: $branch $short"
-echo "push: $remote $shown, $state"
+echo "push: $remote $shown, $state${ssh:+, over ssh to $pushto}"
 echo "base: $base"
 if [ -n "$prn" ]; then
 	echo "pr: existing PR #$prn, the branch is only pushed"
@@ -229,7 +249,7 @@ if [ -z "$go" ]; then
 	delim=PUBLISH_END
 	while grep -q -x "$delim" "$tmp/body"; do delim=${delim}_; done
 	echo "commands, if you have to run them yourself:"
-	echo "  git push $remote $want:refs/heads/$branch"
+	echo "  git push $pushto $want:refs/heads/$branch"
 	if [ -z "$prn" ]; then
 		echo "  gh pr create --repo $repo --base $base --head $headref --title '$(q "$title")'${draft:+ --draft} --body-file - <<'$delim'"
 		cat "$tmp/body"
@@ -243,9 +263,9 @@ fi
 log=$inbox/log.md
 today=$(date +%F)
 if [ -n "$push" ]; then
-	git push "$remote" "$want:refs/heads/$branch" || stop "the push failed, nothing was posted"
-	echo "pushed: $short to $remote/$branch"
-	echo "$today pushed $branch to $remote $(treeurl)" >>"$log"
+	git push "$pushto" "$want:refs/heads/$branch" || stop "the push failed, nothing was posted"
+	echo "pushed: $short to $remote/$branch${ssh:+ over ssh}"
+	echo "$today pushed $branch to $remote${ssh:+ over ssh} $(treeurl)" >>"$log"
 fi
 if [ -n "$prn" ]; then
 	prurl=https://github.com/$repo/pull/$prn
