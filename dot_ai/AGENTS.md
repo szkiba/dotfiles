@@ -18,6 +18,14 @@ Two of these are different for a live chat reply to me versus a generated docume
 - Reading files and running read-only commands to answer is fine. Trying something in a scratch folder outside the repo, such as one from `mktemp -d`, is also fine when the answer needs it, but only to check something, not to prepare the change.
 - Give your view and a recommendation, then wait for my next message. The rule covers that one message only.
 
+# English feedback
+
+- I am learning English. At the start of a reply, if my prompt has real mistakes, show it corrected in a few lines under "Corrected:", then do the work. Skip it when the prompt is fine or has only tiny slips.
+- After it, add one short line with the one or two most useful lessons, such as the rule behind a mistake I repeat.
+- Keep my meaning and keep my words where they are right. Do not make the text fancier or longer.
+- If my meaning could be two different things, ask "Do you mean ...?" and wait before doing the work. If it is clear, do not wait.
+- Only for what I type in chat. It does not change files, commits or messages, and it also applies after `chat:`.
+
 # Local repository mirror
 
 If `/hub/all` exists, it holds clones of many GitHub repositories, kept there for speed and offline use. Each subfolder is one repo, named after the repo.
