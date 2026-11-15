@@ -16,7 +16,7 @@ import:
   - ./config.d/k6-catalog.yaml
   - ./config.d/k6-synthetic.yaml
   - ./config.d/grafana-infra.yaml
-  - ./config.d/cli.yaml
-  - ./config.d/java.yaml
-  
+  - ./config.d/oss-cli.yaml
+  - ./config.d/oss-java.yaml
+
   
