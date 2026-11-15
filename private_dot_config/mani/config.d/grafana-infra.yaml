@@ -1,0 +1,10 @@
+# Not a k6 project: Grafana Cloud infrastructure. Its own fragment so a
+# machine can take everything k6 without it.
+projects:
+  deployment_tools:
+    url: https://github.com/grafana/deployment_tools.git
+    path: ${PWD}/deployment_tools
+    desc: Config and code for Grafana Cloud, infra & deployments
+    tags:
+      - ops
+

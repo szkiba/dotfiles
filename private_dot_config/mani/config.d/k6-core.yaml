@@ -1,0 +1,49 @@
+# The k6 tool itself, its extension builder, its docs and its CI.
+projects:
+  k6:
+    url: https://github.com/grafana/k6.git
+    path: ${PWD}/k6
+    desc: The k6 load testing tool
+    tags:
+      - kex
+      - core
+
+  xk6:
+    url: https://github.com/grafana/xk6.git
+    path: ${PWD}/xk6
+    desc: The k6 extension builder
+    tags:
+      - kex
+      - core
+
+  setup-k6-action:
+    url: https://github.com/grafana/setup-k6-action.git
+    path: ${PWD}/setup-k6-action
+    desc: Continuous integration setup for k6
+    tags:
+      - ops
+      - core
+
+  run-k6-action:
+    url: https://github.com/grafana/run-k6-action.git
+    path: ${PWD}/run-k6-action
+    desc: Continuous integration run for k6
+    tags:
+      - ops
+      - core
+
+  k6-ci:
+    url: https://github.com/grafana/k6-ci.git
+    path: ${PWD}/k6-ci
+    desc: Continuous integration setup for k6
+    tags:
+      - kex
+      - ops
+
+  k6-docs:
+    url: https://github.com/grafana/k6-docs.git
+    path: ${PWD}/k6-docs
+    desc: The k6 documentation website
+    tags:
+      - docs
+

@@ -1,0 +1,25 @@
+# The extension registry and the curated list — the ecosystem's index,
+# rather than the extensions themselves.
+projects:
+  k6registry:
+    url: https://github.com/grafana/k6registry.git
+    path: ${PWD}/k6registry
+    desc: k6 Extension Registry Generator
+    tags:
+      - catalog
+
+  k6-extension-registry:
+    url: https://github.com/grafana/k6-extension-registry.git
+    path: ${PWD}/k6-extension-registry
+    desc: k6 Extension Registry
+    tags:
+      - kex
+      - catalog
+
+  awesome-k6:
+    url: https://github.com/grafana/awesome-k6.git
+    path: ${PWD}/awesome-k6
+    desc: A curated list of awesome k6 tools, content and projects
+    tags:
+      - catalog
+

@@ -1,0 +1,22 @@
+# User config for mani. Mani merges it into every mani.yaml or .mani.yaml it
+# finds, so all project definitions live here, in the fragments under
+# config.d/, and are maintained by chezmoi. A folder's own config only picks
+# which projects to use, for example with a default target.
+#
+# Project paths are ${PWD}/<name>, so repos are cloned into the folder mani is
+# run from. Run mani from the folder that holds its mani.yaml.
+#
+# This file only lists which fragments to take. That is machine specific.
+sync_gitignore: true
+
+import:
+  - ./config.d/k6-core.yaml
+  - ./config.d/k6-extensions.yaml
+  - ./config.d/k6-cloud.yaml
+  - ./config.d/k6-catalog.yaml
+  - ./config.d/k6-synthetic.yaml
+  - ./config.d/grafana-infra.yaml
+  - ./config.d/cli.yaml
+  - ./config.d/java.yaml
+  
+  

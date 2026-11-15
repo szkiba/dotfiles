@@ -1,0 +1,33 @@
+# My Open Source CLI Projects.
+projects:
+  cdo:
+    url: https://github.com/szkiba/cdo.git
+    path: ${PWD}/cdo
+    desc: Markdown-based task runner for contributors
+    tags:
+      - cli
+      - markdown
+
+  mdcode:
+    url: https://github.com/szkiba/mdcode.git
+    path: ${PWD}/mdcode
+    desc: Markdown code block authoring tool
+    tags:
+      - cli
+      - markdown
+
+  docsme:
+    url: https://github.com/szkiba/docsme.git
+    path: ${PWD}/docsme
+    desc: Keep README up to date based on CLI help
+    tags:
+      - cli
+      - markdown
+  
+  efa:
+    url: https://github.com/szkiba/efa.git
+    path: ${PWD}/efa
+    desc: Set go flag values from environment variables
+    tags:
+      - cli
+

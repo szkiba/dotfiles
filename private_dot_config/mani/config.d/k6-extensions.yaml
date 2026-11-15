@@ -1,0 +1,318 @@
+# Every xk6-* extension. The bulk of the estate, and indivisible by
+# import — take all of them or none. Slice with tags instead.
+projects:
+  xk6-example:
+    url: https://github.com/grafana/xk6-example.git
+    path: ${PWD}/xk6-example
+    desc: Example k6 extension
+    tags:
+      - kex
+      - official
+      - javascript
+      - example
+
+  xk6-output-example:
+    url: https://github.com/grafana/xk6-output-example.git
+    path: ${PWD}/xk6-output-example
+    desc: Example k6 output extension
+    tags:
+      - kex
+      - official
+      - output
+      - example
+
+  xk6-dashboard:
+    url: https://github.com/grafana-cold-storage/xk6-dashboard.git
+    path: ${PWD}/xk6-dashboard
+    desc: A k6 extension that makes k6 metrics available on a web-based dashboard
+    tags:
+      - kex
+      - official
+      - output
+      - o11y
+      - archived
+
+  xk6-dashboard-assets:
+    url: https://github.com/grafana/xk6-dashboard-assets.git
+    path: ${PWD}/xk6-dashboard-assets
+    desc: Frontend assets for xk6-dashboard k6 extension
+    tags:
+      - kex
+      - official
+      - output
+      - o11y
+
+  xk6-subcommand-example:
+    url: https://github.com/grafana/xk6-subcommand-example.git
+    path: ${PWD}/xk6-subcommand-example
+    desc: Example k6 subcommand extension
+    tags:
+      - kex
+      - official
+      - subcommand
+      - example
+
+  xk6-client-prometheus-remote:
+    url: https://github.com/grafana/xk6-client-prometheus-remote.git
+    path: ${PWD}/xk6-client-prometheus-remote
+    desc: Test Prometheus Remote Write-compatible endpoints
+    tags:
+      - kex
+      - community
+      - javascript
+      - o11y
+
+  xk6-client-tracing:
+    url: https://github.com/grafana/xk6-client-tracing.git
+    path: ${PWD}/xk6-client-tracing
+    desc: This extension provides k6 with the required functionality required to load test distributed tracing backends.
+    tags:
+      - kex
+      - community
+      - javascript
+      - o11y
+
+  xk6-dns:
+    url: https://github.com/grafana/xk6-dns.git
+    path: ${PWD}/xk6-dns
+    desc: DNS resolution and lookups in your tests
+    tags:
+      - kex
+      - official
+      - javascript
+      - protocol
+
+  xk6-docs:
+    url: https://github.com/grafana/xk6-docs.git
+    path: ${PWD}/xk6-docs
+    desc: CLI k6 docs for AI agents and users. It comes with an agent skill to help AI agents to write k6 scripts with best practices.
+    tags:
+      - kex
+      - official
+      - subcommand
+      - docs
+
+  xk6-faker:
+    url: https://github.com/grafana/xk6-faker.git
+    path: ${PWD}/xk6-faker
+    desc: Generate fake data in your tests
+    tags:
+      - kex
+      - official
+      - javascript
+
+  xk6-icmp:
+    url: https://github.com/grafana/xk6-icmp.git
+    path: ${PWD}/xk6-icmp
+    desc: ICMP protocol support for k6
+    tags:
+      - kex
+      - official
+      - javascript
+      - protocol
+
+  xk6-kubernetes:
+    url: https://github.com/grafana/xk6-kubernetes.git
+    path: ${PWD}/xk6-kubernetes
+    desc: A k6 extension for interacting with Kubernetes clusters while testing.
+    tags:
+      - kex
+      - community
+      - javascript
+
+  xk6-loki:
+    url: https://github.com/grafana/xk6-loki.git
+    path: ${PWD}/xk6-loki
+    desc: Test Grafana Loki log ingestion endpoints
+    tags:
+      - kex
+      - community
+      - javascript
+      - o11y
+
+  xk6-mqtt:
+    url: https://github.com/grafana/xk6-mqtt.git
+    path: ${PWD}/xk6-mqtt
+    desc: MQTT protocol support for k6
+    tags:
+      - kex
+      - official
+      - javascript
+      - protocol
+
+  xk6-output-influxdb:
+    url: https://github.com/grafana/xk6-output-influxdb.git
+    path: ${PWD}/xk6-output-influxdb
+    desc: k6 extension to output real-time test metrics to an InfluxDB 2.x database
+    tags:
+      - kex
+      - official
+      - output
+      - o11y
+
+  xk6-redis:
+    url: https://github.com/grafana/xk6-redis.git
+    path: ${PWD}/xk6-redis
+    desc: Extension for Redis database
+    tags:
+      - kex
+      - official
+      - javascript
+      - protocol
+
+  xk6-sql:
+    url: https://github.com/grafana/xk6-sql.git
+    path: ${PWD}/xk6-sql
+    desc: Load-test SQL Servers
+    tags:
+      - kex
+      - official
+      - javascript
+      - sql
+
+  xk6-sql-driver-ramsql:
+    url: https://github.com/grafana/xk6-sql-driver-ramsql.git
+    path: ${PWD}/xk6-sql-driver-ramsql
+    desc: Repository template for creating xk6-sql driver repositories
+    tags:
+      - kex
+      - community
+      - javascript
+      - sql
+      - example
+
+  xk6-sql-driver-azuresql:
+    url: https://github.com/grafana/xk6-sql-driver-azuresql.git
+    path: ${PWD}/xk6-sql-driver-azuresql
+    desc: xk6-sql driver extension for Microsoft Azure SQL database support
+    tags:
+      - kex
+      - community
+      - javascript
+      - sql
+
+  xk6-sql-driver-clickhouse:
+    url: https://github.com/grafana/xk6-sql-driver-clickhouse.git
+    path: ${PWD}/xk6-sql-driver-clickhouse
+    desc: xk6-sql driver extension for ClickHouse database support
+    tags:
+      - kex
+      - community
+      - javascript
+      - sql
+
+  xk6-sql-driver-mysql:
+    url: https://github.com/grafana/xk6-sql-driver-mysql.git
+    path: ${PWD}/xk6-sql-driver-mysql
+    desc: xk6-sql driver extension for MySQL database support
+    tags:
+      - kex
+      - official
+      - javascript
+      - sql
+
+  xk6-sql-driver-postgres:
+    url: https://github.com/grafana/xk6-sql-driver-postgres.git
+    path: ${PWD}/xk6-sql-driver-postgres
+    desc: xk6-sql driver extension for Postgres database support
+    tags:
+      - kex
+      - official
+      - javascript
+      - sql
+
+  xk6-sql-driver-sqlite3:
+    url: https://github.com/grafana/xk6-sql-driver-sqlite3.git
+    path: ${PWD}/xk6-sql-driver-sqlite3
+    desc: xk6-sql driver extension for SQLite v3 database support
+    tags:
+      - kex
+      - community
+      - javascript
+      - sql
+
+  xk6-sql-driver-sqlserver:
+    url: https://github.com/grafana/xk6-sql-driver-sqlserver.git
+    path: ${PWD}/xk6-sql-driver-sqlserver
+    desc: xk6-sql driver extension for Microsoft SQL Server database support
+    tags:
+      - kex
+      - community
+      - javascript
+      - sql
+
+  xk6-ssh:
+    url: https://github.com/grafana/xk6-ssh.git
+    path: ${PWD}/xk6-ssh
+    desc: Use SSH connections in your tests
+    tags:
+      - kex
+      - official
+      - javascript
+      - protocol
+
+  xk6-subcommand-agent:
+    url: https://github.com/grafana/xk6-subcommand-agent.git
+    path: ${PWD}/xk6-subcommand-agent
+    desc: Bootstrap an AI-assisted k6 testing workflow in any editor
+    tags:
+      - kex
+      - official
+      - subcommand
+      - docs
+
+  xk6-subcommand-explore:
+    url: https://github.com/grafana/xk6-subcommand-explore.git
+    path: ${PWD}/xk6-subcommand-explore
+    desc: Explore k6 extensions for Automatic Resolution
+    tags:
+      - kex
+      - official
+      - subcommand
+
+  xk6-subcommand-httpbin:
+    url: https://github.com/grafana/xk6-subcommand-httpbin.git
+    path: ${PWD}/xk6-subcommand-httpbin
+    desc: Run a local httpbin server from k6
+    tags:
+      - kex
+      - community
+      - subcommand
+
+  xk6-tcp:
+    url: https://github.com/grafana/xk6-tcp.git
+    path: ${PWD}/xk6-tcp
+    desc: TCP protocol support for k6
+    tags:
+      - kex
+      - official
+      - javascript
+      - protocol
+
+  xk6-tls:
+    url: https://github.com/grafana/xk6-tls.git
+    path: ${PWD}/xk6-tls
+    desc: TLS certificates validation and inspection
+    tags:
+      - kex
+      - community
+      - javascript
+
+  xk6-kafka:
+    url: https://github.com/grafana/xk6-kafka.git
+    path: ${PWD}/xk6-kafka
+    desc: Kafka protocol support for k6
+    tags:
+      - kex
+      - official
+      - javascript
+      - protocol
+
+  xk6-subcommand-openapi:
+    url: https://github.com/grafana/xk6-subcommand-openapi.git
+    path: ${PWD}/xk6-subcommand-openapi
+    desc: OpenAPI subcommand extension for k6
+    tags:
+      - kex
+      - official
+      - subcommand

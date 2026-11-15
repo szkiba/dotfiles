@@ -1,0 +1,9 @@
+# My Open Source Java Projects.
+projects:
+  ini4j:
+    url: https://github.com/ini4j/ini4j.git
+    path: ${PWD}/ini4j
+    desc: The Java Windows .ini library.
+    tags:
+      - java
+      - ini

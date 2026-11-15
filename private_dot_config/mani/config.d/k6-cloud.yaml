@@ -1,0 +1,22 @@
+# Components of distributed/cloud test execution.
+projects:
+  k6-cloud-agent:
+    url: https://github.com/grafana/k6-cloud-agent.git
+    path: ${PWD}/k6-cloud-agent
+    desc: Cloud agent for k6
+    tags:
+      - cloud
+
+  k6-cloud-testcoordinator:
+    url: https://github.com/grafana/k6-cloud-testcoordinator.git
+    path: ${PWD}/k6-cloud-testcoordinator
+    desc: Central component to orchestrate the distributed execution of a test
+    tags:
+      - cloud
+
+  k6-cloud-integration-tests:
+    url: https://github.com/grafana/k6-cloud-integration-tests.git
+    path: ${PWD}/k6-cloud-integration-tests
+    desc: Integration tests for k6 cloud
+    tags:
+      - cloud

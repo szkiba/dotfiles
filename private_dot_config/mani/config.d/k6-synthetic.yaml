@@ -1,0 +1,34 @@
+# Components of distributed/cloud test execution.
+projects:
+  xk6-sm:
+    url: https://github.com/grafana/xk6-sm.git
+    path: ${PWD}/xk6-sm
+
+    desc: k6 output extension for Synthetic Monitoring
+    tags:
+      - synthetic
+      - kex
+      - output
+
+  synthetic-monitoring-agent:
+    path: ${PWD}/synthetic-monitoring-agent
+    url: https://github.com/grafana/synthetic-monitoring-agent.git
+    desc: Synthetic Monitoring agent
+    tags:
+      - synthetic
+
+  sm-k6-runner:
+    path: ${PWD}/sm-k6-runner
+    url: https://github.com/grafana/sm-k6-runner.git
+    desc: Synthetic Monitoring k6 runner
+    tags:
+      - synthetic
+
+  k6-synthy:
+    path: ${PWD}/k6-synthy
+    url: https://github.com/grafana-experimental/k6-synthy.git
+    desc: An experiment to make scripted synthetic monitoring checks much cheaper to run
+    tags:
+      - experimental
+      - bet
+      - synthetic
