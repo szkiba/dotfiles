@@ -79,7 +79,7 @@ Skip it for trivial changes, as with the checker.
 
 5. Report to the user in a few lines: each finding with your verdict, what you changed, and what you left alone. After the second round, say whether significant findings remain and ask whether to run another. If you ran a self-review, add one line: how many findings it raised, how many were real, and what you fixed, so the user can judge whether the step is worth its cost.
 
-6. When no further round is planned and the milestone-snapshots skill applies (big work, jj set up), take the milestone snapshot now, not before or between rounds. Add the `Review:` trailer described in that skill, with this review's topic and the rounds that ran, and say so if you changed code after the last round. A jj snapshot needs no approval, see the jj section of AGENTS.md. Git commits and pushes follow the user's global agent instructions: show the exact commit message and wait for approval, and ask before every push.
+6. When no further round is planned and the milestone-snapshots skill applies (big work, jj set up), take the milestone snapshot now, not before or between rounds. Add the `Review:` trailer described in that skill, and say so if you changed code after the last round. A jj snapshot needs no approval, see the jj section of AGENTS.md. Git commits and pushes follow the user's global agent instructions: show the exact commit message and wait for approval, and ask before every push.
 
 ## Notes
 
