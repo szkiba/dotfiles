@@ -85,4 +85,4 @@ Say what exists now in a few lines: the commits with their hashes, subjects and 
 
 Do not delete either unasked.
 
-End your report with one plain line for the next step: run `github-publish` in your own terminal on the host, which shows the exact PR text and asks for the approval. Say if anything still waits for the user here, and if nothing does, say so.
+End your report with one plain line for the next step: run `github-publish` in your own terminal on the host (`github-publish --ssh` if a branch changes `.github/workflows/`), which shows the exact PR text and asks for the approval. Say if anything still waits for the user here, and if nothing does, say so.
