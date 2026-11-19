@@ -1,0 +1,6 @@
+[Unit]
+Description=Back up to the prepared pendrive %I
+
+[Service]
+Type=oneshot
+ExecStart=%h/.local/bin/pendrive-backup.sh /dev/%I

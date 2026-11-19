@@ -1,0 +1,6 @@
+# Install: sudo ln -s ~/.local/etc/udev/rules.d/81-pendrive-backup.rules /etc/udev/rules.d/81-pendrive-backup.rules
+# Reload: sudo udevadm control --reload
+
+# A USB partition with a filesystem appears -> start pendrive-backup@<device>.service.
+# The script only backs up to a pendrive that has the right token in its env.sh.
+ACTION=="add", SUBSYSTEM=="block", ENV{DEVTYPE}=="partition", ENV{ID_BUS}=="usb", ENV{ID_FS_USAGE}=="filesystem", RUN+="/usr/bin/systemctl --machine={{ .chezmoi.username }}@.host --user start --no-block pendrive-backup@%k.service"
