@@ -56,6 +56,8 @@ Fix findings in jj, for example with `jj describe -r <rev> -m "<message>"` or by
 
 ## Sign
 
+Before you sign, put the commits where they will stay, because a rebase after signing signs them again and costs another key touch. They must sit directly on the current base, with no goal commit below them. The sandbox clone can be behind: run `git fetch origin <base>` and rebase the unsigned commits onto it. If the network is blocked, `git fetch /run/sandbox/source +refs/remotes/origin/<base>:refs/remotes/host/<base>` gives the host's view. `github-publish` stops when the base is not an ancestor of the branch.
+
 Signing is the last step. jj commits have an empty author when jj has no identity configured, which happens when `~/.config/jj/config.toml` is missing. The first command sets the author from the git config and changes nothing when it is already right. Then sign:
 
     jj --config user.name="$(git config user.name)" --config user.email="$(git config user.email)" metaedit -r 'snap/<topic>..@-' --update-author

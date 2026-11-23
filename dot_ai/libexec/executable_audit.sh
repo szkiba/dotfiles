@@ -341,6 +341,8 @@ JQ_PROG=$(
 | ($sid[0:8]) as $s
 | def where($e): "\($s) \($e.ts[0:16])";
   def prevprompt($i): ([$E[] | select(.key < $i and .value.kind == "prompt") | .value.text] | last // "") | snip(50);
+  # A prompt that says approve, yes, commit or push is the approval itself, so the commit or push after it is not listed.
+  def approved($i): ([$E[] | select(.key < $i and .value.kind == "prompt") | .value.text] | last // "") | test("(?i)\\b(approved?|yes|ok(ay)?|go ahead|commit|push|post|sign)\\b");
   (["#meta", $agent, $s, $cwd,
     ($ev | map(select(.kind == "prompt")) | length | tostring),
     ($ev | map(select(.kind == "tool")) | length | tostring)] | @tsv),
@@ -364,6 +366,14 @@ JQ_PROG=$(
     | select(($p.text | test("(?mi)^#+[ \\t]*workflow")) | not)
     | ["WARN", "plan-no-workflow", "\(where($p)): the last plan of the session has no Workflow section"] | @tsv ),
 
+  # AGENTS.md (Plans, since 2026-11-10): a maker-checker round runs on the plan before it is first shown.
+  ( select($agent == "claude")
+    | [ $E[] | select(.value.kind == "tool" and .value.name == "ExitPlanMode" and .value.ts >= "2026-11-10T18:48") ] as $plans
+    | select(($plans | length) > 0)
+    | $plans[0].value as $p
+    | select(($ev | any(.[]; .kind == "tool" and .name == "Skill" and (.text | test("maker-checker")) and .ts < $p.ts)) | not)
+    | ["WARN", "plan-unreviewed", "\(where($p)): the first plan of the session was shown before any maker-checker round"] | @tsv ),
+
   # A chat: prompt only allows reading, for that one message.
   ( ($E | map(select(.value.kind == "prompt")) ) as $PR
     | range(0; $PR | length) as $n
@@ -382,11 +392,12 @@ JQ_PROG=$(
           ["FAIL", "attribution", "\(where($e)): \($e.name) call contains an AI attribution line: `\($e.text | around(attribution))`"] | @tsv else empty end ),
       ( if $e.name == "Bash" and ($e.text | test(signing_bypass)) and ($e.text | test(fixture) | not) then
           ["WARN", "signing-bypass", "\(where($e)): command turns off or changes commit signing: `\($e.text | around(signing_bypass))`, fine in a throwaway clone, not in the real repo"] | @tsv else empty end ),
-      ( if $e.name == "Bash" and ($e.text | test(gitsub("commit"))) and ($e.text | test(fixture) | not) then
+      ( if $e.name == "Bash" and ($e.text | test(gitsub("commit"))) and ($e.text | test(fixture) | not) and (approved($i) | not) then
           ["WARN", "commit-approval", "\(where($e)): `\($e.text | around(gitsub("commit")))`, check that the exact message was shown and approved first (after prompt \"\(prevprompt($i))\")"] | @tsv else empty end ),
       ( ( if $e.name == "Bash" and ($e.text | test(outbound)) then ($e.text | around(outbound))
           elif ($e.name | test(mcp_write)) then "\($e.name) \($e.text | snip(60))"
           else empty end) as $what
+        | select(approved($i) | not)
         | [ "WARN", "outbound-write",
             "\(where($e)): `\($what)`, check that the user approved it (after prompt \"\(prevprompt($i))\")"] | @tsv )
   )

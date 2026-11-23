@@ -67,7 +67,7 @@ Some repos and sandboxes have jj set up next to git in colocated mode, so both a
 
 # Plans
 
-- When you write a plan for work that changes files, end it with a Workflow section and then follow it: the prerequisites if there are any (tools to install, network access, open questions, how many signing touches are coming), then wait for my go-ahead; the goal commit; the milestones (milestone-snapshots skill); the commits I keep through commit-curator; my approval of the exact commit message; and a `github-publish` request instead of a push. For changes that are not trivial, run a maker-checker round on the plan before you ask me to approve it, one on each milestone before its snapshot, and one on the finished code. The jj steps apply only where jj is set up. If you skip a step, say so and why.
+- When you write a plan for work that changes files, end it with a Workflow section that names every step below, and write "skipped" with the reason for one that does not apply. Then follow it: the prerequisites if there are any (tools to install, network access, open questions, how many signing touches are coming), then wait for my go-ahead; the goal commit; the milestones (milestone-snapshots skill); the commits I keep through commit-curator; my approval of the exact commit message; and a `github-publish` request instead of a push. For changes that are not trivial, run a maker-checker round on the plan and fix what it finds before you show me the plan, in plan mode too, so before ExitPlanMode. Then run one round on each milestone before its snapshot, and one on the finished code. The jj steps apply only where jj is set up.
 
 # Slack messages
 
